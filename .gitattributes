@@ -1,2 +1,4 @@
-# Scripts del servidor: siempre con saltos de línea de Linux
+# Scripts del servidor, migraciones y flujos: siempre con saltos de línea de Linux
 *.sh text eol=lf
+*.sql text eol=lf
+*.json text eol=lf
