@@ -1,0 +1,24 @@
+# Base de datos LOCAL para desarrollo: copia de tu base "trd" (desde ../trd.sql).
+# No se conecta al VPS. Para borrarla y empezar de cero:
+#   docker compose -f docker-compose.dev.yml down -v
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: iagro-db-local
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: iagro_local
+      POSTGRES_DB: trd
+      TZ: UTC
+    ports:
+      - "54320:5432"
+    volumes:
+      - ../trd.sql:/docker-entrypoint-initdb.d/01-trd.sql:ro
+      - iagro_db_local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d trd"]
+      interval: 3s
+      retries: 20
+
+volumes:
+  iagro_db_local:

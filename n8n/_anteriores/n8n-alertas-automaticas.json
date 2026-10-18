@@ -1,0 +1,511 @@
+{
+  "name": "Iagro alertas automáticas",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "id": "bd279a81-09f2-423d-bf67-6a255ab086c2",
+      "name": "Todos los días 6:00"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "chatwoot_base_url",
+              "value": "https://chat.iagro360.xyz/api/v1",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "chatwoot_account_id",
+              "value": "2",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "enviar_resumen_diario",
+              "value": "false",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "plantilla_whatsapp",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "plantilla_idioma",
+              "value": "es",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "id": "efdd2d4e-94bc-4f91-8f26-1c4d6a1a1060",
+      "name": "Configuración Alertas"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "users",
+          "mode": "list",
+          "cachedResultName": "users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "is_active",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        300
+      ],
+      "id": "cc2d3467-63f6-46a0-9d8c-fedf415a52c2",
+      "name": "Usuarios Activos",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.open-meteo.com/v1/forecast?latitude={{ $json.latitude }}&longitude={{ $json.longitude }}&timezone=auto&forecast_days=3&wind_speed_unit=kmh&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max",
+        "options": {
+          "timeout": 15000,
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        660,
+        300
+      ],
+      "id": "3d645d9d-4f47-420f-a587-99303e0cea2e",
+      "name": "Pronóstico 3 días (Open-Meteo)",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Modo: \"Run Once for Each Item\" — 1 respuesta de Open-Meteo por usuario\nconst u = $('Usuarios Activos').item.json;\nconst cfg = $('Configuración Alertas').first().json;\nconst enviarResumen = String(cfg.enviar_resumen_diario) === 'true';\nconst d = $json.daily;\n\nconst HELADA = 2, LLUVIA_FUERTE = 20, RAFAGA = 50, CALOR = 34;\nconst fmt = (v) => (Number(v) || 0).toLocaleString('es', { maximumFractionDigits: 1 });\nconst DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];\nconst nombreDia = (iso, i) => i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : `${DIAS[new Date(iso + 'T12:00').getDay()]} ${iso.slice(8, 10)}/${iso.slice(5, 7)}`;\n\nif (!d || !u.phone_number) return { json: { enviar: false } };\n\n// Solo se avisa de los próximos 3 días (lo urgente)\nconst alertas = [];\nfor (let i = 0; i < Math.min(3, d.time.length); i++) {\n  const dia = nombreDia(d.time[i], i);\n  if (d.temperature_2m_min[i] <= HELADA) alertas.push(`🥶 *Helada ${dia}*: mínima ${fmt(d.temperature_2m_min[i])} °C`);\n  if (d.precipitation_sum[i] >= LLUVIA_FUERTE) alertas.push(`🌧️ *Lluvia intensa ${dia}*: ${fmt(d.precipitation_sum[i])} mm`);\n  if ([95, 96, 99].includes(d.weather_code[i])) alertas.push(`⛈️ *${d.weather_code[i] >= 96 ? 'Granizo' : 'Tormenta'} ${dia}*`);\n  if (d.wind_gusts_10m_max[i] >= RAFAGA) alertas.push(`💨 *Viento fuerte ${dia}*: ráfagas de ${Math.round(d.wind_gusts_10m_max[i])} km/h`);\n  if (d.temperature_2m_max[i] >= CALOR) alertas.push(`🔥 *Calor extremo ${dia}*: ${fmt(d.temperature_2m_max[i])} °C`);\n}\n\nconst finca = u.nombre_propiedad || 'tu campo';\nconst resumenHoy = `🌡️ ${Math.round(d.temperature_2m_min[0])}° / ${Math.round(d.temperature_2m_max[0])}°C · 🌧️ ${d.precipitation_probability_max[0] ?? 0}% (${fmt(d.precipitation_sum[0])} mm)`;\n\nconst content = alertas.length\n  ? `🔔 *ALERTA CLIMÁTICA — ${finca}*\\n\\n${alertas.join('\\n')}\\n\\n📍 Hoy: ${resumenHoy}\\n\\nEscribe *Alertas* para ver recomendaciones o *Fumigar* para ver horarios seguros.\\n\\n📡 _IAGRO | Monitoreo Climático Inteligente_`\n  : `📰 *Buenos días — ${finca}*\\n\\n${resumenHoy}\\n✅ Sin alertas para los próximos 3 días.\\n\\nEscribe *Pronóstico* para ver el detalle. 🌾\\n\\n📡 _IAGRO_`;\n\n// Texto corto para la variable {{1}} de la plantilla de WhatsApp\nconst resumen_plantilla = alertas.length ? alertas.join(' | ').replace(/\\*/g, '') : `${resumenHoy}. Sin alertas.`;\n\nreturn {\n  json: {\n    enviar: alertas.length > 0 || enviarResumen,\n    phone_number: u.phone_number,\n    nombre_propiedad: finca,\n    content,\n    resumen_plantilla\n  }\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ],
+      "id": "806ea40a-e138-4ce1-9d41-b106de705ce4",
+      "name": "Calcular Alertas"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "00b7be5f-f608-4059-b56f-29924494ac83",
+              "leftValue": "={{ $json.enviar }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1100,
+        300
+      ],
+      "id": "1f1f12aa-e4e3-4840-9a6a-1f64191d7fb4",
+      "name": "¿Hay algo que enviar?"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Configuración Alertas').first().json.chatwoot_base_url }}/accounts/{{ $('Configuración Alertas').first().json.chatwoot_account_id }}/contacts/search?q={{ encodeURIComponent($json.phone_number) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1320,
+        280
+      ],
+      "id": "cf58701a-fa6f-4a62-a03d-09f588076e1b",
+      "name": "Buscar Contacto Chatwoot",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Modo: \"Run Once for Each Item\" — toma el primer contacto encontrado en Chatwoot\nconst contacto = ($json.payload || [])[0];\nreturn { json: { contact_id: contacto ? String(contacto.id) : '' } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        280
+      ],
+      "id": "6a1363f2-d90c-4a4a-b7ef-b3dbb8071bde",
+      "name": "Elegir Contacto"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ad41a11a-827f-4482-8672-d10db86c491d",
+              "leftValue": "={{ $json.contact_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1760,
+        280
+      ],
+      "id": "32e284b5-f2c5-4c84-90ac-6a9e8cb6020b",
+      "name": "¿Contacto Existe?"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Configuración Alertas').first().json.chatwoot_base_url }}/accounts/{{ $('Configuración Alertas').first().json.chatwoot_account_id }}/contacts/{{ $json.contact_id }}/conversations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1980,
+        260
+      ],
+      "id": "6837882b-0b92-4c1f-b079-b143546eb190",
+      "name": "Conversaciones del Contacto",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Modo: \"Run Once for Each Item\"\n// Elige la conversación más reciente del contacto y arma el mensaje.\n// Si hay plantilla de WhatsApp configurada, la usa (obligatorio si el cliente\n// no escribió en las últimas 24 h; sin plantilla WhatsApp rechaza el mensaje).\nconst cfg = $('Configuración Alertas').first().json;\nconst alerta = $('Calcular Alertas').item.json;\n\nconst convs = ($json.payload || []).slice().sort((a, b) => (b.last_activity_at || 0) - (a.last_activity_at || 0));\nconst conv = convs[0];\nif (!conv) return { json: { conversation_id: '' } };\n\nconst payload = { content: alerta.content, message_type: 'outgoing', private: false };\nif (cfg.plantilla_whatsapp) {\n  payload.template_params = {\n    name: cfg.plantilla_whatsapp,\n    category: 'UTILITY',\n    language: cfg.plantilla_idioma || 'es',\n    processed_params: { '1': alerta.resumen_plantilla.slice(0, 900) }\n  };\n}\n\nreturn { json: { conversation_id: String(conv.id), chatwoot_payload: payload } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        260
+      ],
+      "id": "79c82f6e-eb14-4b6a-b05c-6e743b4c296f",
+      "name": "Armar Mensaje Alerta"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ed766b3b-7226-4fcd-a4b2-0bfe88947322",
+              "leftValue": "={{ $json.conversation_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2420,
+        260
+      ],
+      "id": "f50af7fe-5d92-4088-a8a1-6c4592c0360f",
+      "name": "¿Tiene Conversación?"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Configuración Alertas').first().json.chatwoot_base_url }}/accounts/{{ $('Configuración Alertas').first().json.chatwoot_account_id }}/conversations/{{ $json.conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.chatwoot_payload) }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2640,
+        240
+      ],
+      "id": "2a76bd27-0952-44bc-b7ed-62cc1dc9a779",
+      "name": "Enviar Alerta Chatwoot",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## 🔔 Alertas automáticas IAGRO\nTodos los días a las 6:00 revisa el pronóstico (3 días) de cada usuario activo y envía por WhatsApp las alertas de helada, lluvia intensa, tormenta/granizo, viento y calor.\n\n**Configuración Alertas:**\n- `enviar_resumen_diario` = `true` → también manda resumen cuando no hay alertas\n- `plantilla_whatsapp` = nombre de una plantilla **aprobada en Meta** con 1 variable `{{1}}`.\n\n⚠️ WhatsApp solo permite mensajes libres dentro de las 24 h desde el último mensaje del cliente. Fuera de esa ventana **necesitas la plantilla**, si no el mensaje no llega.\nRevisar la zona horaria del workflow (Settings → Timezone).",
+        "height": 380,
+        "width": 760,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -120
+      ],
+      "id": "70cd9703-8c6a-4644-b3db-2c8044dcd817",
+      "name": "Nota - alertas"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Todos los días 6:00": {
+      "main": [
+        [
+          {
+            "node": "Configuración Alertas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración Alertas": {
+      "main": [
+        [
+          {
+            "node": "Usuarios Activos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Usuarios Activos": {
+      "main": [
+        [
+          {
+            "node": "Pronóstico 3 días (Open-Meteo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pronóstico 3 días (Open-Meteo)": {
+      "main": [
+        [
+          {
+            "node": "Calcular Alertas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular Alertas": {
+      "main": [
+        [
+          {
+            "node": "¿Hay algo que enviar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay algo que enviar?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Contacto Chatwoot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Contacto Chatwoot": {
+      "main": [
+        [
+          {
+            "node": "Elegir Contacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Elegir Contacto": {
+      "main": [
+        [
+          {
+            "node": "¿Contacto Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Contacto Existe?": {
+      "main": [
+        [
+          {
+            "node": "Conversaciones del Contacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversaciones del Contacto": {
+      "main": [
+        [
+          {
+            "node": "Armar Mensaje Alerta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar Mensaje Alerta": {
+      "main": [
+        [
+          {
+            "node": "¿Tiene Conversación?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tiene Conversación?": {
+      "main": [
+        [
+          {
+            "node": "Enviar Alerta Chatwoot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "57ca2d17e06c938c45a8e1723b76ac450730448c2b371a42fbaabb0215ce5022"
+  },
+  "tags": []
+}

@@ -1,0 +1,791 @@
+{
+  "name": "IAGRO · Difusiones",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "iagro-difusion",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "name": "Webhook panel",
+      "webhookId": "cd33208f-4949-4c78-8033-9466347a32f1",
+      "id": "b0905dcf-4e14-469c-aad8-bf19c11c3c89"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.cfg_texto('n8n_token', '') AS token",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        200,
+        300
+      ],
+      "name": "Token",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "id": "3d41aae2-0943-4c2e-8566-ef2e8d5df0ee"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Valida el token del panel y el id de la difusión\nconst h = $('Webhook panel').first().json.headers || {};\nconst body = $('Webhook panel').first().json.body || {};\nconst token = h['x-iagro-token'] || '';\nconst esperado = $('Token').first().json.token || '';\nconst id = Number(body.difusion_id);\nconst ok = !!esperado && token === esperado && Number.isInteger(id) && id > 0;\nreturn [{ json: { ok, difusion_id: ok ? id : null, motivo: ok ? null : (!token || token !== esperado ? 'Token inválido' : 'difusion_id inválido') } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ],
+      "name": "Validar",
+      "id": "9254b53b-12f5-4bb9-8b8d-15ac754641c2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2cd9161c-408d-417f-b6f2-7df7e0562467",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        600,
+        300
+      ],
+      "name": "¿Autorizado?",
+      "id": "6fec105c-5118-42c6-9226-3978b8cd584f"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.motivo }) }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        480
+      ],
+      "name": "Responder 401",
+      "id": "9344a2e8-6938-450f-9fff-aacf1d98704b"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM bot_clima.preparar_difusion($1::bigint)",
+        "options": {
+          "queryReplacement": "={{ [$json.difusion_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        800,
+        200
+      ],
+      "name": "Preparar difusión",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput",
+      "id": "7ff905a7-ece2-4833-bf92-bf04fa0ef9cb"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, destinatarios: $('Preparar difusión').all().filter(i => i.json.envio_id).length }) }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1000,
+        200
+      ],
+      "name": "Responder OK",
+      "executeOnce": true,
+      "id": "98b918cb-4690-4794-a9f8-6075b25987a4"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: String($json.error?.message || $json.error || $json.message || \"No se pudo preparar la difusión\") }) }}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1000,
+        420
+      ],
+      "name": "Responder error",
+      "id": "a721f4a2-6b44-48db-9c4a-2cdad82285eb"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9c983317-06a8-42a3-9993-9023d4d7c2fa",
+              "leftValue": "={{ $('Preparar difusión').all().some(i => i.json.envio_id) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        200
+      ],
+      "name": "¿Hay destinatarios?",
+      "id": "4f234d63-d1a7-48c5-9190-718a2a2ff732",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.config_json() AS cfg",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1400,
+        100
+      ],
+      "name": "Configuración",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "id": "a0978441-22c2-4b08-bfcf-f32e06fe990e",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Arma un mensaje por destinatario. {nombre} en el texto se reemplaza por el nombre del usuario.\nconst cfg = $('Configuración').first().json.cfg;\nconst filas = $('Preparar difusión').all().map((i) => i.json).filter((r) => r.envio_id);\n\nreturn filas.map((r) => {\n  const nombre = String(r.nombre || '').trim().split(/\\s+/)[0] || 'agricultor';\n  const texto = String(r.mensaje || '').replaceAll('{nombre}', nombre);\n  const dentro24h = r.ultimo_mensaje_el && (Date.now() - new Date(r.ultimo_mensaje_el).getTime()) < 23.5 * 3600 * 1000;\n  return {\n    json: {\n      envio_id: r.envio_id,\n      usuario_id: r.usuario_id,\n      telefono: r.telefono,\n      nombre: r.nombre || '',\n      chatwoot_contact_id: r.chatwoot_contact_id || null,\n      contenido: texto,\n      usar_plantilla: !dentro24h,\n      plantilla: {\n        nombre: r.plantilla || cfg.plantilla_difusion,\n        idioma: r.plantilla_idioma || cfg.plantilla_idioma || 'es',\n        parametros: [texto],\n      },\n      pausa_seg: Math.max(0, Number(cfg.difusion_pausa_ms ?? 1200)) / 1000,\n    },\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        100
+      ],
+      "name": "Armar mensajes",
+      "id": "ebbc243f-6dea-4316-b943-0299b993304c"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1800,
+        100
+      ],
+      "name": "Uno por uno",
+      "id": "e7350b61-4d44-413e-b4e0-c1e6d63510a8"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "IAGRO · Enviar WhatsApp"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2000,
+        200
+      ],
+      "name": "Enviar WhatsApp",
+      "id": "0d8a9de3-f513-4279-94af-c65076e1fbac"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Une el destinatario con el resultado del envío\nconst d = $('Armar mensajes').item.json;\nconst r = $json;\nreturn {\n  json: {\n    envio_id: String(d.envio_id),\n    conversation_id: r.conversation_id ? String(r.conversation_id) : '',\n    message_id: r.message_id ? String(r.message_id) : '',\n    contact_id: r.contact_id ? String(r.contact_id) : '',\n    error: r.ok ? '' : String(r.error || 'Error desconocido al enviar').slice(0, 500),\n    pausa_seg: d.pausa_seg,\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        200
+      ],
+      "name": "Unir resultado",
+      "id": "7f8846bd-aa3c-44d6-b974-190f116742d9"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.registrar_envio_difusion($1::bigint, NULLIF($2, '')::bigint, NULLIF($3, '')::bigint, NULLIF($4, '')::bigint, NULLIF($5, ''))",
+        "options": {
+          "queryReplacement": "={{ [$json.envio_id, $json.conversation_id, $json.message_id, $json.contact_id, $json.error] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2400,
+        200
+      ],
+      "name": "Registrar envío",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "e99bb5de-f0f0-4be9-a33b-29256a5fdb73"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('Unir resultado').item.json.pausa_seg }}",
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2600,
+        200
+      ],
+      "name": "Pausa",
+      "webhookId": "d20028ed-671c-4a2b-bc5a-e5e3e0eda32e",
+      "id": "05f25add-b707-427b-81de-036eb947dfbf"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT estado, total_destinatarios FROM bot_clima.finalizar_difusion($1::bigint)",
+        "options": {
+          "queryReplacement": "={{ [$('Validar').first().json.difusion_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2000,
+        -40
+      ],
+      "name": "Finalizar",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "executeOnce": true,
+      "id": "3126c95a-2977-47ad-9124-22feec617f0a"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $json;\nconst id = $('Validar').first().json.difusion_id;\nreturn [{ json: { nivel: d.estado === 'error' ? 'error' : 'info', mensaje: `Difusión #${id} ${d.estado} (${d.total_destinatarios} destinatarios)`, datos: JSON.stringify({ difusion_id: id, estado: d.estado }) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        -40
+      ],
+      "name": "Resumen",
+      "id": "d4b06bf9-6e1b-4e0c-874c-060abab8f665"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "bot_clima",
+          "mode": "name"
+        },
+        "table": {
+          "__rl": true,
+          "value": "logs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nivel": "={{ $json.nivel }}",
+            "origen": "n8n:difusiones",
+            "mensaje": "={{ $json.mensaje }}",
+            "datos": "={{ $json.datos }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "nivel",
+              "displayName": "nivel",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "origen",
+              "displayName": "origen",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mensaje",
+              "displayName": "mensaje",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "datos",
+              "displayName": "datos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2400,
+        -40
+      ],
+      "name": "Log difusión",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "85b2ae9c-7575-4000-bfc7-df1208fdd6b5"
+    },
+    {
+      "parameters": {
+        "jsCode": "const id = $('Validar').first().json.difusion_id;\nconst e = $json.error?.message || $json.error || $json.message || 'Error';\nreturn [{ json: { nivel: 'error', mensaje: `No se pudo preparar la difusión #${id}: ${e}`, datos: JSON.stringify({ difusion_id: id }) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        420
+      ],
+      "name": "Error al preparar",
+      "id": "58e34c9a-1a11-4ac9-8272-20df79ea2831"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "bot_clima",
+          "mode": "name"
+        },
+        "table": {
+          "__rl": true,
+          "value": "logs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nivel": "={{ $json.nivel }}",
+            "origen": "n8n:difusiones",
+            "mensaje": "={{ $json.mensaje }}",
+            "datos": "={{ $json.datos }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "nivel",
+              "displayName": "nivel",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "origen",
+              "displayName": "origen",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mensaje",
+              "displayName": "mensaje",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "datos",
+              "displayName": "datos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1400,
+        420
+      ],
+      "name": "Log error",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "dda66317-dd69-47ef-a107-5faa3da43dea"
+    },
+    {
+      "parameters": {
+        "content": "## 📣 IAGRO · Difusiones\nEl **panel** llama a este webhook al tocar *Enviar*. Valida el token (se genera solo en la base), responde enseguida y envía **uno por uno** con una pausa entre mensajes.\n\n- Excluye automáticamente a quien está **pausado por no responder** (configurable en el panel)\n- Si el usuario escribió en las últimas 24 h → texto libre; si no → plantilla `difusion_general`\n- Cada envío queda en `difusion_envios` (enviado / error); entregado/leído/respondió los completa *Seguimiento de estados*\n\n⚠️ Después de importar:\n1. En **Enviar WhatsApp** elige *IAGRO · Enviar WhatsApp*\n2. Copia la **Production URL** del webhook en el panel → Configuración → Integraciones",
+        "width": 840,
+        "height": 360,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "name": "Nota",
+      "id": "579e1c70-f6f8-4a17-b2e0-06e279a7e9c6"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook panel": {
+      "main": [
+        [
+          {
+            "node": "Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token": {
+      "main": [
+        [
+          {
+            "node": "Validar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar": {
+      "main": [
+        [
+          {
+            "node": "¿Autorizado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Autorizado?": {
+      "main": [
+        [
+          {
+            "node": "Preparar difusión",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar difusión": {
+      "main": [
+        [
+          {
+            "node": "Responder OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder error": {
+      "main": [
+        [
+          {
+            "node": "Error al preparar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error al preparar": {
+      "main": [
+        [
+          {
+            "node": "Log error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder OK": {
+      "main": [
+        [
+          {
+            "node": "¿Hay destinatarios?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay destinatarios?": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finalizar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Armar mensajes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar mensajes": {
+      "main": [
+        [
+          {
+            "node": "Uno por uno",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Uno por uno": {
+      "main": [
+        [
+          {
+            "node": "Finalizar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Unir resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unir resultado": {
+      "main": [
+        [
+          {
+            "node": "Registrar envío",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar envío": {
+      "main": [
+        [
+          {
+            "node": "Pausa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pausa": {
+      "main": [
+        [
+          {
+            "node": "Uno por uno",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalizar": {
+      "main": [
+        [
+          {
+            "node": "Resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumen": {
+      "main": [
+        [
+          {
+            "node": "Log difusión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/La_Paz",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "meta": {
+    "instanceId": "57ca2d17e06c938c45a8e1723b76ac450730448c2b371a42fbaabb0215ce5022"
+  },
+  "tags": []
+}

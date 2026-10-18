@@ -1,0 +1,14 @@
+# Dependencias y builds
+node_modules/
+.next/
+out/
+
+# Secretos
+.env
+.env.local
+*.env
+
+# Respaldos de base de datos: contienen teléfonos de clientes
+trd.sql
+*.dump
+*.backup

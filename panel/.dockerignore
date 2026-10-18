@@ -1,0 +1,8 @@
+node_modules
+.next
+.env
+.env.local
+*.env
+tsconfig.tsbuildinfo
+Dockerfile
+docker-compose*.yml

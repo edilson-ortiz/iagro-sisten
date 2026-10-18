@@ -1,0 +1,35 @@
+# =====================================================================
+# IAGRO en el servidor (producción)
+#   Sitio + registro + radar + panel en una sola app (Next.js).
+#   Usa la base "trd" del contenedor "postgres" que ya existe (la misma de n8n).
+#
+#   sudo docker compose run --rm migrar        → aplica migraciones (crea/actualiza bot_clima)
+#   sudo docker compose up -d --build panel    → construye y levanta
+#   sudo docker compose logs -f panel          → ver logs
+# =====================================================================
+name: iagro-panel
+
+services:
+  panel:
+    build: { context: ../panel, target: runner }
+    container_name: iagro-panel
+    env_file: .env
+    ports:
+      - "${PUERTO:-8080}:3000"   # 8080 = donde apunta hoy el túnel de Cloudflare (reemplaza a iagro-web)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # para llegar al Postgres del servidor (puerto 5432)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Herramientas de una sola vez: migraciones y crear administrador
+  migrar:
+    build: { context: ../panel, target: tools }
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: ["node", "scripts/migrar.mjs"]
+    profiles: ["herramientas"]

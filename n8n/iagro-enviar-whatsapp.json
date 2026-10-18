@@ -1,0 +1,801 @@
+{
+  "name": "IAGRO · Enviar WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ],
+      "name": "Entrada",
+      "id": "0d88d0d2-bea5-450b-b260-58b6181ab123"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.config_json() AS cfg",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        200,
+        300
+      ],
+      "name": "Configuración",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "id": "dd6f6f63-464f-4fc8-8316-0a81d8632417"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Entrada: { usuario_id, telefono, nombre, chatwoot_contact_id?, contenido, usar_plantilla, plantilla:{nombre, idioma, parametros[]} }\nconst e = $('Entrada').item.json;\nconst cfg = $json.cfg || {};\nconst base = `${String(cfg.chatwoot_url_publica || '').replace(/\\/+$/, '')}/api/v1/accounts/${cfg.chatwoot_account_id}`;\nconst inbox = Number(cfg.chatwoot_inbox_id || 0);\nconst tel = String(e.telefono || '').replace(/\\D/g, '');\n\nlet error = null;\nif (!cfg.chatwoot_url_publica || !cfg.chatwoot_account_id) error = 'Falta configurar la URL o la cuenta de Chatwoot (panel → Configuración → WhatsApp).';\nelse if (!inbox) error = 'Falta configurar el ID del inbox de WhatsApp (panel → Configuración → WhatsApp).';\nelse if (tel.length < 8) error = `Teléfono inválido: \"${e.telefono}\"`;\nelse if (e.usar_plantilla && !e.plantilla?.nombre) error = 'Falta el nombre de la plantilla de WhatsApp.';\n\nreturn { json: { base, inbox, tel, error } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ],
+      "name": "Preparar",
+      "id": "f721e1b3-465e-45c6-b520-838884f6e4eb"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "98f15fc9-8de4-489c-9e17-b4db34a974ca",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        600,
+        300
+      ],
+      "name": "¿Datos válidos?",
+      "id": "74211b40-0a0b-4752-8bc2-3fd355eb083f"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Preparar').item.json.base }}/contacts/search?q={{ $json.tel }}",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        200
+      ],
+      "name": "Buscar contacto",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "078b458c-b5f6-496d-844c-f134ad490077"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Resultado de /contacts/search: elige el contacto cuyo teléfono coincide exactamente\nconst p = $('Preparar').item.json;\nconst lista = $json.payload || [];\nconst c = lista.find((x) => String(x.phone_number || '').replace(/\\D/g, '') === p.tel);\nreturn { json: { contact_id: c ? c.id : null, contact_inboxes: c?.contact_inboxes || [] } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        200
+      ],
+      "name": "Contacto buscado",
+      "id": "0b6b79f4-35ae-4d97-8b3f-01efd0ad2e8d"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0b133e96-ca45-4a1f-b415-25aebaecb5ca",
+              "leftValue": "={{ $json.contact_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        200
+      ],
+      "name": "¿Existe contacto?",
+      "id": "546ee354-2f9f-4dff-bdf4-dafac46d70f7"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Preparar').item.json.base }}/contacts",
+        "options": {
+          "timeout": 20000
+        },
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ inbox_id: $('Preparar').item.json.inbox, name: $('Entrada').item.json.nombre || ('+' + $('Preparar').item.json.tel), phone_number: '+' + $('Preparar').item.json.tel }) }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        360
+      ],
+      "name": "Crear contacto",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "6c8f1293-5ae1-4e46-9df3-08c4f0ed6450"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Respuesta de POST /contacts → mismo formato que \"Contacto buscado\"\nconst c = $json.payload?.contact || $json.payload || $json;\nreturn { json: { contact_id: c.id, contact_inboxes: c.contact_inboxes || [] } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        360
+      ],
+      "name": "Contacto creado",
+      "id": "cd7e3ee5-425f-42e0-98ff-9e18c7e6eaec"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ¿El contacto ya está vinculado al inbox de WhatsApp? (source_id = número de WhatsApp)\nconst p = $('Preparar').item.json;\nconst ci = ($json.contact_inboxes || []).find((x) => Number(x.inbox?.id ?? x.inbox_id) === p.inbox);\nreturn { json: { contact_id: $json.contact_id, source_id: ci ? ci.source_id : null } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        200
+      ],
+      "name": "Tiene inbox",
+      "id": "ee655a40-e755-4339-8fd1-257761b54517"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bf8ca2d1-9541-46c6-a4fc-39a5adfcffc0",
+              "leftValue": "={{ $json.source_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2000,
+        200
+      ],
+      "name": "¿Vinculado al inbox?",
+      "id": "c1170048-0469-4ab2-a595-924e615519f3"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Preparar').item.json.base }}/contacts/{{ $json.contact_id }}/contact_inboxes",
+        "options": {
+          "timeout": 20000
+        },
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ inbox_id: $('Preparar').item.json.inbox, source_id: $('Preparar').item.json.tel }) }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        360
+      ],
+      "name": "Vincular inbox",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "e27d8c90-2cae-485e-8d96-ee2c3eaf84be"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Respuesta de POST /contacts/{id}/contact_inboxes\nreturn { json: { contact_id: $('Tiene inbox').item.json.contact_id, source_id: $json.source_id } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        360
+      ],
+      "name": "Inbox vinculado",
+      "id": "daef93e3-cb48-4b74-986c-8052dddf49b9"
+    },
+    {
+      "parameters": {
+        "jsCode": "return { json: { contact_id: $json.contact_id, source_id: $json.source_id } };",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        200
+      ],
+      "name": "Contacto listo",
+      "id": "7ad9c1bd-7523-4b99-a39f-7b95d949e0d0"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Preparar').item.json.base }}/contacts/{{ $json.contact_id }}/conversations",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2800,
+        200
+      ],
+      "name": "Conversaciones",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "de7f684a-d7b1-43f0-8992-e8cd3cb93619"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Elige la conversación más reciente del contacto en el inbox de WhatsApp (abierta primero)\nconst p = $('Preparar').item.json;\nconst contacto = $('Contacto listo').item.json;\nconst convs = ($json.payload || []).filter((c) => Number(c.inbox_id) === p.inbox);\nconst prioridad = { open: 0, pending: 1, snoozed: 2, resolved: 3 };\nconvs.sort((a, b) => (prioridad[a.status] ?? 9) - (prioridad[b.status] ?? 9) || (b.last_activity_at || 0) - (a.last_activity_at || 0));\nreturn { json: { contact_id: contacto.contact_id, source_id: contacto.source_id, conversation_id: convs[0]?.id ?? null } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3000,
+        200
+      ],
+      "name": "Elegir conversación",
+      "id": "03a94fb1-3844-482f-bae6-d10bf15f3703"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bc5ec3c0-5234-4d31-8a3d-9b38d4225a20",
+              "leftValue": "={{ $json.conversation_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3200,
+        200
+      ],
+      "name": "¿Hay conversación?",
+      "id": "a9032652-54bf-4a7d-b3b0-d65e3f3f701a"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Preparar').item.json.base }}/conversations",
+        "options": {
+          "timeout": 20000
+        },
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source_id: $json.source_id, inbox_id: $('Preparar').item.json.inbox, contact_id: $json.contact_id, status: 'open' }) }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3400,
+        360
+      ],
+      "name": "Crear conversación",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "8f34a006-63c1-4b24-96ff-1e1741596924"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Arma el mensaje: plantilla aprobada (fuera de la ventana de 24 h) o texto libre\nconst e = $('Entrada').item.json;\nconst conv = $json.conversation_id ?? $json.id;\nconst contacto = $('Contacto listo').item.json;\n\nconst payload = { content: e.contenido, message_type: 'outgoing', private: false };\nif (e.usar_plantilla) {\n  const params = {};\n  (e.plantilla.parametros || []).forEach((v, i) => {\n    // WhatsApp no acepta saltos de línea, tabulaciones ni más de 4 espacios seguidos en variables\n    params[String(i + 1)] = String(v ?? '').replace(/[\\r\\n\\t]+/g, ' ').replace(/ {4,}/g, '   ').trim().slice(0, 1000);\n  });\n  payload.template_params = {\n    name: e.plantilla.nombre,\n    category: 'UTILITY',\n    language: e.plantilla.idioma || 'es',\n    processed_params: params,\n  };\n}\nreturn { json: { conversation_id: conv, contact_id: contacto.contact_id, payload } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3600,
+        200
+      ],
+      "name": "Armar mensaje",
+      "id": "afcf5287-0f5b-4a63-8536-faca4ea60ec5"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Preparar').item.json.base }}/conversations/{{ $json.conversation_id }}/messages",
+        "options": {
+          "timeout": 20000
+        },
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3800,
+        200
+      ],
+      "name": "Enviar mensaje",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "42d77dce-ac12-496f-933a-04e2e39904d7"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Salida del sub-flujo cuando el mensaje se envió\nconst m = $('Armar mensaje').item.json;\nreturn {\n  json: {\n    ok: true,\n    usuario_id: $('Entrada').item.json.usuario_id,\n    contact_id: m.contact_id,\n    conversation_id: m.conversation_id,\n    message_id: $json.id,\n    error: null,\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        200
+      ],
+      "name": "Resultado OK",
+      "id": "8ecb71f6-fe59-4ffe-9dc4-bf74a4768045"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Salida del sub-flujo cuando algo falló (validación o error de Chatwoot)\nconst e = $('Entrada').item.json;\nconst j = $json || {};\nlet detalle = j.error;\nif (detalle && typeof detalle === 'object') {\n  detalle = detalle.message || detalle.description || JSON.stringify(detalle);\n}\nif (!detalle) detalle = j.message || j.description || 'Error al comunicarse con Chatwoot';\nreturn {\n  json: {\n    ok: false,\n    usuario_id: e.usuario_id,\n    contact_id: null,\n    conversation_id: null,\n    message_id: null,\n    error: `[${$prevNode.name}] ${String(detalle)}`.slice(0, 500),\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        520
+      ],
+      "name": "Resultado con error",
+      "id": "891aed44-2cc5-4f60-9464-765ebb1ad87b"
+    },
+    {
+      "parameters": {
+        "content": "## 📤 IAGRO · Enviar WhatsApp (sub-flujo)\nLo usan **Alerta de lluvia** y **Difusiones**.\n\n1. Busca el contacto en Chatwoot por teléfono (o lo crea)\n2. Lo vincula al inbox de WhatsApp si hace falta\n3. Usa la conversación existente o abre una nueva\n4. Envía **plantilla** (fuera de 24 h) o **texto libre**\n\nDevuelve `{ ok, contact_id, conversation_id, message_id, error }`. Cualquier error termina en **Resultado con error** (nunca corta al flujo que lo llamó).\n\n⚙️ Datos de Chatwoot e inbox: panel → Configuración → WhatsApp.",
+        "width": 760,
+        "height": 300,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -160
+      ],
+      "name": "Nota",
+      "id": "645cbea4-be38-47ea-8aa2-8a9cc06cd134"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Entrada": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Preparar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar": {
+      "main": [
+        [
+          {
+            "node": "¿Datos válidos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Datos válidos?": {
+      "main": [
+        [
+          {
+            "node": "Buscar contacto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado con error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar contacto": {
+      "main": [
+        [
+          {
+            "node": "Contacto buscado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado con error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contacto buscado": {
+      "main": [
+        [
+          {
+            "node": "¿Existe contacto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Existe contacto?": {
+      "main": [
+        [
+          {
+            "node": "Tiene inbox",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Crear contacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear contacto": {
+      "main": [
+        [
+          {
+            "node": "Contacto creado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado con error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contacto creado": {
+      "main": [
+        [
+          {
+            "node": "Tiene inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tiene inbox": {
+      "main": [
+        [
+          {
+            "node": "¿Vinculado al inbox?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Vinculado al inbox?": {
+      "main": [
+        [
+          {
+            "node": "Contacto listo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Vincular inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vincular inbox": {
+      "main": [
+        [
+          {
+            "node": "Inbox vinculado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado con error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inbox vinculado": {
+      "main": [
+        [
+          {
+            "node": "Contacto listo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contacto listo": {
+      "main": [
+        [
+          {
+            "node": "Conversaciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversaciones": {
+      "main": [
+        [
+          {
+            "node": "Elegir conversación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado con error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Elegir conversación": {
+      "main": [
+        [
+          {
+            "node": "¿Hay conversación?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay conversación?": {
+      "main": [
+        [
+          {
+            "node": "Armar mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Crear conversación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear conversación": {
+      "main": [
+        [
+          {
+            "node": "Armar mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado con error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar mensaje": {
+      "main": [
+        [
+          {
+            "node": "Enviar mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar mensaje": {
+      "main": [
+        [
+          {
+            "node": "Resultado OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado con error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/La_Paz",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "meta": {
+    "instanceId": "57ca2d17e06c938c45a8e1723b76ac450730448c2b371a42fbaabb0215ce5022"
+  },
+  "tags": []
+}

@@ -1,0 +1,617 @@
+{
+  "name": "IAGRO · Alerta de lluvia (cada hora)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "5 * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "name": "Cada hora (min 5)",
+      "id": "8e97aa3f-1ce7-44be-a962-229109c17446"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.config_json() AS cfg",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        200,
+        300
+      ],
+      "name": "Configuración",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "id": "79f584d0-691c-4b4c-b7b3-c8145d20aca8"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM bot_clima.alerta_lluvia_lote()",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        400,
+        300
+      ],
+      "name": "Candidatos",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "executeOnce": true,
+      "id": "12b73d3d-facc-403f-88e8-dc56cf6e49f8"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Agrupa a los candidatos por cercanía (grupo calculado en la base) → 1 consulta de pronóstico por grupo\nconst cfg = $('Configuración').first().json.cfg;\nconst grupos = new Map();\n\nfor (const { json: u } of $input.all()) {\n  if (!u.usuario_id) continue;\n  if (!grupos.has(u.grupo)) grupos.set(u.grupo, { grupo: u.grupo, lat: u.grupo_lat, lon: u.grupo_lon, usuarios: [] });\n  grupos.get(u.grupo).usuarios.push(u);\n}\n\nconst base = String(cfg.lluvia_api_url || '').replace(/\\/+$/, '');\nconst fuente = cfg.lluvia_fuente === 'open-meteo' ? 'open-meteo' : 'iagro';\n\nreturn [...grupos.values()].map((g) => ({\n  json: {\n    ...g,\n    fuente,\n    url: fuente === 'open-meteo'\n      ? `https://api.open-meteo.com/v1/forecast?latitude=${g.lat}&longitude=${g.lon}&hourly=precipitation_probability,precipitation&timezone=${encodeURIComponent(cfg.zona_horaria || 'America/La_Paz')}&forecast_days=3`\n      : `${base}/forecast/hourly?lat=${g.lat}&lon=${g.lon}`,\n  },\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        300
+      ],
+      "name": "Agrupar por zona",
+      "id": "3c0fc147-d724-475c-ac1c-44d2e25ef3f2"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 20000,
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        300
+      ],
+      "name": "Consultar pronóstico",
+      "onError": "continueRegularOutput",
+      "id": "af3929a1-433b-472b-ab17-b7f849e87d6d"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Para cada usuario: busca su PRÓXIMA lluvia (primera hora que supera el umbral) en el pronóstico de su grupo.\n// - Devuelve un item por usuario (se guarda en bot_clima.pronosticos → el panel muestra \"faltan X h\").\n// - enviar = true cuando la lluvia está a N horas o menos (por defecto 24) y la base permite enviarle (puede_enviar).\nconst cfg = $('Configuración').first().json.cfg;\nconst grupos = $('Agrupar por zona').all();\nconst tz = cfg.zona_horaria || 'America/La_Paz';\nconst umbral = Number(cfg.lluvia_umbral ?? 60);\nconst mmMinimo = Number(cfg.lluvia_mm_minimo ?? 0);\nconst horas = Number(cfg.lluvia_horas_anticipacion ?? 24);\n\nconst ahora = DateTime.now().setZone(tz);\nconst desde = ahora.startOf('hour');            // la hora en curso cuenta como \"lloviendo ahora\"\nconst limite = ahora.plus({ hours: horas });\nconst DIAS = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];\n\nconst num = (v) => { const n = parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : null; };\n\nfunction cuandoTexto(dt) {\n  const d = Math.round(dt.startOf('day').diff(ahora.startOf('day'), 'days').days);\n  return `${d === 0 ? 'hoy' : d === 1 ? 'mañana' : DIAS[dt.weekday]} ${dt.toFormat('dd/LL')} a las ${dt.toFormat('HH:mm')}`;\n}\n\n/** API IAGRO: data[].fecha (dd/mm/aaaa) + horarios[].h (\"15:00\" o \"15\"), rp = probabilidad, sr = mm */\nfunction horasIagro(resp) {\n  const out = [];\n  for (const dia of Array.isArray(resp?.data) ? resp.data : []) {\n    const f = String(dia.fecha ?? '').trim();\n    let base = DateTime.fromFormat(f, 'd/L/yyyy', { zone: tz });\n    if (!base.isValid) base = DateTime.fromISO(f.slice(0, 10), { zone: tz });\n    if (!base.isValid) continue;\n    for (const x of dia.horarios || []) {\n      const m = String(x.h ?? x.hora ?? '').match(/(\\d{1,2})(?::\\d{2})?\\s*$/);\n      if (!m) continue;\n      out.push({ dt: base.set({ hour: Number(m[1]) }), prob: num(x.rp), mm: num(x.sr) ?? 0 });\n    }\n  }\n  return out;\n}\n\n/** Open-Meteo: hourly.time en hora local (se pidió con timezone) */\nfunction horasOpenMeteo(resp) {\n  const h = resp?.hourly || {};\n  return (h.time || []).map((t, i) => ({\n    dt: DateTime.fromISO(t, { zone: tz }), prob: num(h.precipitation_probability?.[i]), mm: num(h.precipitation?.[i]) ?? 0,\n  }));\n}\n\nconst salida = [];\n$input.all().forEach((item, i) => {\n  const g = grupos[i]?.json;\n  if (!g) return;\n  const resp = item.json;\n\n  let lista = [];\n  let error = null;\n  if (resp?.error) error = String(resp.error.message || resp.error).slice(0, 300);\n  else {\n    lista = (g.fuente === 'open-meteo' ? horasOpenMeteo(resp) : horasIagro(resp))\n      .filter((x) => x.dt.isValid && x.dt >= desde && x.prob != null)\n      .sort((a, b) => a.dt.toMillis() - b.dt.toMillis());\n    if (!lista.length) error = 'El pronóstico no trae horas futuras';\n  }\n\n  const llueve = (x) => x.prob > umbral && x.mm >= mmMinimo;\n  const proxima = lista.find(llueve) || null;\n  const objetivo = lista.find((x) => llueve(x) && x.dt > ahora && x.dt <= limite) || null;  // la que se avisa\n  const horizonte = lista.length ? lista[lista.length - 1].dt : null;\n\n  for (const u of g.usuarios) {\n    const enviar = Boolean(objetivo && u.puede_enviar);\n    const base = {\n      usuario_id: u.usuario_id,\n      telefono: u.telefono,\n      nombre: u.nombre || '',\n      chatwoot_contact_id: u.chatwoot_contact_id || null,\n      enviar,\n      motivo: u.motivo || null,\n      fuente: g.fuente,\n      error,\n      proxima_lluvia: proxima ? proxima.dt.toISO() : null,\n      probabilidad: proxima ? Math.round(proxima.prob) : null,\n      mm: proxima ? proxima.mm : null,\n      horizonte_hasta: horizonte ? horizonte.toISO() : null,\n    };\n    if (!enviar) { salida.push({ json: base }); continue; }\n\n    // Siempre la plantilla aprobada por Meta: trae los botones\n    // \"Pronóstico 7 días\" · \"¿A qué hora llueve?\" · \"Dejar de recibir\" (así se mide quién responde)\n    const saludo = String(cfg.lluvia_saludo || 'Agricultor').trim();\n    const campo = String(u.nombre || u.zona || 'tu campo').trim();\n    const prob = Math.round(objetivo.prob);\n    const mm = objetivo.mm >= 1 ? ` (unos *${Math.round(objetivo.mm)} mm*)` : '';\n    const pronostico = `*${cuandoTexto(objetivo.dt)}* hay *${prob}%* de probabilidad de lluvia${mm}`;\n    salida.push({\n      json: {\n        ...base,\n        probabilidad_alerta: prob,\n        hora_pronostico: objetivo.dt.toISO(),\n        usar_plantilla: true,\n        // Mismo texto que la plantilla {{1}} {{2}} {{3}}: así se ve igual en Chatwoot y en el panel\n        contenido: `Hola ${saludo} 👋\\n\\n🌧️ Aviso de lluvia para *${campo}*: según el pronóstico, ${pronostico}.\\n\\n_Toca una opción para continuar._`,\n        plantilla: {\n          nombre: cfg.plantilla_lluvia || 'notificacion_pronostico',\n          idioma: cfg.plantilla_idioma || 'es',\n          parametros: [saludo, campo, pronostico],\n        },\n      },\n    });\n  }\n});\n\nreturn salida;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        200
+      ],
+      "name": "Evaluar pronóstico",
+      "id": "dddf1c2a-8ef0-45ce-b7e6-830dd7dbfdd0"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "46d7b716-d986-4726-9e71-fe536cb338be",
+              "leftValue": "={{ $json.enviar }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        200
+      ],
+      "name": "¿Enviar alerta?",
+      "id": "3fa77fde-c7e6-40f0-9633-44394cd9e306"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "IAGRO · Enviar WhatsApp"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1400,
+        120
+      ],
+      "name": "Enviar WhatsApp",
+      "id": "7c5c8085-57e5-41ce-ad8c-d363a9971bab"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Une los datos de la alerta con el resultado del envío (sub-flujo \"Enviar WhatsApp\")\nconst a = $('¿Enviar alerta?').item.json;\nconst r = $json;\nreturn {\n  json: {\n    usuario_id: String(a.usuario_id),\n    probabilidad: String(a.probabilidad_alerta),\n    hora_pronostico: a.hora_pronostico,\n    conversation_id: r.conversation_id ? String(r.conversation_id) : '',\n    message_id: r.message_id ? String(r.message_id) : '',\n    contact_id: r.contact_id ? String(r.contact_id) : '',\n    error: r.ok ? '' : String(r.error || 'Error desconocido al enviar').slice(0, 500),\n  },\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        120
+      ],
+      "name": "Unir resultado",
+      "id": "33691790-d087-44e1-bee0-856267dde5a0"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Junta la próxima lluvia de todos los usuarios en un solo JSON → bot_clima.guardar_pronosticos()\nconst filas = $input.all().map(({ json: x }) => ({\n  usuario_id: x.usuario_id,\n  proxima_lluvia: x.proxima_lluvia,\n  probabilidad: x.probabilidad,\n  mm: x.mm,\n  horizonte_hasta: x.horizonte_hasta,\n  fuente: x.fuente,\n  error: x.error,\n}));\nreturn [{ json: { total: filas.length, datos: JSON.stringify(filas) } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        320
+      ],
+      "name": "Pronósticos a JSON",
+      "id": "1c9ba6dc-6f99-4a99-97bd-bb60a13eed1b"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.guardar_pronosticos($1::jsonb) AS guardados",
+        "options": {
+          "queryReplacement": "={{ [$json.datos] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1600,
+        320
+      ],
+      "name": "Guardar próxima lluvia",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "8bb1ac8e-4bd0-465b-aee0-ea1a1b694ce7"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.vincular_contacto($1::bigint, NULLIF($7, '')::bigint),\n       (bot_clima.registrar_alerta_lluvia($1::bigint, $2::int, $3::timestamptz,\n          NULLIF($4, '')::bigint, NULLIF($5, '')::bigint, NULLIF($6, ''))).estado AS estado",
+        "options": {
+          "queryReplacement": "={{ [$json.usuario_id, $json.probabilidad, $json.hora_pronostico, $json.conversation_id, $json.message_id, $json.error, $json.contact_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1800,
+        120
+      ],
+      "name": "Registrar alerta",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "e9dc163b-b3d0-404c-9488-d1ba8071bebf"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $('Unir resultado').all().map((i) => i.json);\nconst fallidos = r.filter((x) => x.error);\nreturn [{ json: {\n  nivel: fallidos.length ? (fallidos.length === r.length ? 'error' : 'aviso') : 'info',\n  mensaje: `Alertas de lluvia: ${r.length - fallidos.length} enviadas, ${fallidos.length} con error`,\n  datos: JSON.stringify({ enviadas: r.length - fallidos.length, errores: fallidos.map((x) => ({ usuario_id: x.usuario_id, error: x.error })) }),\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        120
+      ],
+      "name": "Resumen envíos",
+      "id": "6fa16afe-7277-4c63-afb5-072324919a43"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "bot_clima",
+          "mode": "name"
+        },
+        "table": {
+          "__rl": true,
+          "value": "logs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nivel": "={{ $json.nivel }}",
+            "origen": "n8n:alerta_lluvia",
+            "mensaje": "={{ $json.mensaje }}",
+            "datos": "={{ $json.datos }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "nivel",
+              "displayName": "nivel",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "origen",
+              "displayName": "origen",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mensaje",
+              "displayName": "mensaje",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "datos",
+              "displayName": "datos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2200,
+        120
+      ],
+      "name": "Log envíos",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "e5a00ed0-32e3-4229-b456-576b0b5ae11c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Resumen de las consultas de pronóstico (para bot_clima.logs): grupos consultados y errores\nconst grupos = $('Agrupar por zona').all();\nconst errores = [];\n$input.all().forEach((item, i) => {\n  const g = grupos[i]?.json;\n  const r = item.json;\n  const sinDatos = g?.fuente === 'open-meteo' ? !r?.hourly : !Array.isArray(r?.data);\n  if (r?.error || sinDatos) {\n    errores.push({ grupo: g?.grupo, usuarios: g?.usuarios?.length, error: r?.error?.message || r?.error || 'Respuesta sin datos de pronóstico' });\n  }\n});\nreturn [{\n  json: {\n    nivel: errores.length ? 'error' : 'info',\n    mensaje: errores.length\n      ? `Pronóstico: ${errores.length} de ${grupos.length} consultas fallaron`\n      : `Pronóstico consultado para ${grupos.length} grupo(s)`,\n    datos: JSON.stringify({ grupos: grupos.length, errores }),\n  },\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        560
+      ],
+      "name": "Resumen consultas",
+      "id": "455ca6d1-020d-4ed9-b3d0-691310a589fa"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "bot_clima",
+          "mode": "name"
+        },
+        "table": {
+          "__rl": true,
+          "value": "logs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nivel": "={{ $json.nivel }}",
+            "origen": "n8n:alerta_lluvia",
+            "mensaje": "={{ $json.mensaje }}",
+            "datos": "={{ $json.datos }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "nivel",
+              "displayName": "nivel",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "origen",
+              "displayName": "origen",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mensaje",
+              "displayName": "mensaje",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "datos",
+              "displayName": "datos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1200,
+        560
+      ],
+      "name": "Log consultas",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "fdc80f8a-f80e-4473-8bb1-2086c7d75e58"
+    },
+    {
+      "parameters": {
+        "content": "## 🌧️ IAGRO · Alerta de lluvia\nCorre **cada hora** (minuto 5). Todo se configura desde el panel → Configuración → Lluvia:\n- Umbral de probabilidad, horas de anticipación (24), lluvia mínima en mm\n- Máximo de alertas por semana (1, 2…) y horas mínimas entre alertas\n- Alertas activas/desactivadas por usuario (panel → ficha del usuario)\n- Se desactivan solas si no responde N alertas seguidas o si toca *Dejar de recibir*\n- Siempre se envía la plantilla **notificacion_pronostico** (con sus 3 botones)\n- Horario de envío y fuente del pronóstico (API IAGRO u Open-Meteo)\n\n**Candidatos**: todos los vigentes con ubicación; la base marca a quién se le puede enviar ahora (tope semanal, pausa, horario). Las ubicaciones cercanas se agrupan → una sola consulta de pronóstico por grupo.\n\n**Evaluar pronóstico** busca la próxima lluvia de cada usuario: se guarda para el panel (\"faltan 5 h\") y, si está a 24 h o menos, se envía la alerta.\n\n⚠️ Después de importar: en **Enviar WhatsApp** elige el flujo *IAGRO · Enviar WhatsApp*.",
+        "width": 860,
+        "height": 420,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -220
+      ],
+      "name": "Nota",
+      "id": "c27bd740-618b-456d-b8af-fd11309452f9"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cada hora (min 5)": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Candidatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Candidatos": {
+      "main": [
+        [
+          {
+            "node": "Agrupar por zona",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agrupar por zona": {
+      "main": [
+        [
+          {
+            "node": "Consultar pronóstico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar pronóstico": {
+      "main": [
+        [
+          {
+            "node": "Evaluar pronóstico",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Resumen consultas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluar pronóstico": {
+      "main": [
+        [
+          {
+            "node": "¿Enviar alerta?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Pronósticos a JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Enviar alerta?": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Unir resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unir resultado": {
+      "main": [
+        [
+          {
+            "node": "Registrar alerta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pronósticos a JSON": {
+      "main": [
+        [
+          {
+            "node": "Guardar próxima lluvia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar alerta": {
+      "main": [
+        [
+          {
+            "node": "Resumen envíos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumen envíos": {
+      "main": [
+        [
+          {
+            "node": "Log envíos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumen consultas": {
+      "main": [
+        [
+          {
+            "node": "Log consultas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/La_Paz",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "meta": {
+    "instanceId": "57ca2d17e06c938c45a8e1723b76ac450730448c2b371a42fbaabb0215ce5022"
+  },
+  "tags": []
+}

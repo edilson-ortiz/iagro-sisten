@@ -1,0 +1,64 @@
+/* Radar de lluvia del cliente (mismo diseño que el radar.html original) */
+.app {
+  --navy: #182849;
+  --navy-dark: #101c37;
+  --green: #7cb342;
+  --green-dark: #5c8a2e;
+  --sky: #8ecae6;
+  --blue: #2e86c1;
+  --text-light: #f5f8fa;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--navy-dark);
+  color: var(--text-light);
+  font-family: var(--f-texto), sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+.app * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Mapa: ocupa todo; el texto de "cargando" queda debajo y el mapa lo tapa al cargar */
+.mapa { position: relative; flex: 1; min-height: 0; background: #0e161f; overflow: hidden; }
+.frame { position: absolute; top: -10px; left: 0; width: 100%; height: calc(100% + 10px); border: 0; }
+.cargando {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: var(--f-mono), monospace; font-size: 0.85rem; opacity: 0.7; pointer-events: none;
+}
+
+/* Encabezado, barra de temporada y leyenda flotan sobre el mapa */
+.overlay { position: absolute; top: 0; left: 0; right: 0; z-index: 10; pointer-events: none; }
+.overlay > * { pointer-events: auto; }
+
+.cabecera { background: var(--navy-dark); padding: 12px 16px 10px; display: flex; align-items: center; gap: 12px; }
+.logo { width: 42px; height: 42px; flex-shrink: 0; }
+.textos { min-width: 0; }
+.marca {
+  font-family: var(--f-mono), monospace; font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--sky); opacity: 0.9; margin-bottom: 2px;
+}
+.nombre {
+  font-family: var(--f-titulo), serif; font-weight: 700; font-size: 1.35rem; line-height: 1.15;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.meta { font-family: var(--f-mono), monospace; font-size: 0.68rem; color: var(--sky); margin-top: 3px; opacity: 0.8; }
+
+.temporada {
+  height: 6px;
+  background: linear-gradient(90deg, var(--navy) 0%, var(--green) 35%, var(--sky) 65%, var(--blue) 100%);
+  background-size: 200% 100%;
+  animation: temporada 18s linear infinite;
+}
+@keyframes temporada { 0% { background-position: 0% 0%; } 100% { background-position: 200% 0%; } }
+@media (prefers-reduced-motion: reduce) { .temporada { animation: none; } }
+
+.leyenda { display: flex; gap: 14px; padding: 9px 16px; background: var(--navy); font-size: 0.76rem; font-weight: 600; flex-wrap: wrap; }
+.chip { display: flex; align-items: center; gap: 6px; opacity: 0.9; }
+.punto { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.suave { background: var(--sky); }
+.moderada { background: var(--blue); }
+.intensa { background: var(--green-dark); }
+
+.pie { flex-shrink: 0; background: var(--navy-dark); text-align: center; padding: 6px 10px; font-size: 0.66rem; opacity: 0.5; }
+.pie a { color: var(--sky); }

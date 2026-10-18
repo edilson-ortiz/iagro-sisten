@@ -1,0 +1,51 @@
+# IAGRO — stack local completo
+#   docker compose up -d --build
+# Todo en http://localhost:3000 (una sola app Next.js):
+#   /  /contacto  /privacidad  /terminos  /registro  /radar/{id}  /clima  y el panel en /panel
+name: iagro
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: iagro-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: iagro_local
+      POSTGRES_DB: trd
+      TZ: UTC
+    ports:
+      - "54320:5432"
+    volumes:
+      - ./trd.sql:/docker-entrypoint-initdb.d/01-trd.sql:ro
+      - iagro_db_local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d trd"]
+      interval: 3s
+      retries: 20
+
+  # Aplica las migraciones pendientes y termina
+  migrar:
+    build: { context: ./panel, target: tools }
+    environment:
+      DATABASE_URL: postgres://postgres:iagro_local@db:5432/trd
+    command: ["node", "scripts/migrar.mjs"]
+    depends_on:
+      db: { condition: service_healthy }
+
+  panel:
+    build: { context: ./panel, target: runner }
+    container_name: iagro-panel
+    env_file: ./panel/.env.local
+    environment:
+      DATABASE_URL: postgres://postgres:iagro_local@db:5432/trd
+      COOKIE_INSEGURA: "1" # http://localhost, sin HTTPS
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrar: { condition: service_completed_successfully }
+
+volumes:
+  # Reutiliza la base de panel/docker-compose.dev.yml (mismos datos)
+  iagro_db_local:
+    external: true
+    name: panel_iagro_db_local

@@ -1,0 +1,2479 @@
+{
+  "name": "Iagro bot (IA clima completo)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "5f86dd28-8e72-4d22-a4a5-56ca04cd996c",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        192,
+        464
+      ],
+      "id": "65520bca-e932-4ac7-9523-f3584d6ae347",
+      "name": "Webhook",
+      "webhookId": "5f86dd28-8e72-4d22-a4a5-56ca04cd996c"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-incoming",
+              "leftValue": "={{ $json.body.message_type }}",
+              "rightValue": "incoming",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-no-privado",
+              "leftValue": "={{ $json.body.private === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        464
+      ],
+      "id": "4c059ac6-6e97-4cb4-a05e-ec46e44a9c82",
+      "name": "Filtrar Mensajes Entrantes"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg1",
+              "name": "chatwoot_base_url",
+              "value": "https://chat.iagro360.xyz/api/v1",
+              "type": "string"
+            },
+            {
+              "id": "cfg2",
+              "name": "chatwoot_account_id",
+              "value": "2",
+              "type": "string"
+            },
+            {
+              "id": "cfg3",
+              "name": "weather_api_url",
+              "value": "http://192.168.1.10:3001",
+              "type": "string"
+            },
+            {
+              "id": "cfg4",
+              "name": "planes_url",
+              "value": "https://iagro360.xyz/planes",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-nombre",
+              "name": "feria_nombre",
+              "value": "Agro Vidas",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-0",
+              "name": "feria_lat",
+              "value": "-17.428293",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-1",
+              "name": "feria_lon",
+              "value": "-63.196858",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-2",
+              "name": "feria_dia1",
+              "value": "16/10/2026",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-3",
+              "name": "feria_dia2",
+              "value": "17/10/2026",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-4",
+              "name": "feria_stand",
+              "value": "Recinto ferial Agro Vidas",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-5",
+              "name": "feria_stand_lat",
+              "value": "-17.428293",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-6",
+              "name": "feria_stand_lon",
+              "value": "-63.196858",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-7",
+              "name": "feria_premio",
+              "value": "premios iAgro",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-8",
+              "name": "feria_precio",
+              "value": "25 Bs",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-9",
+              "name": "feria_wa_link",
+              "value": "https://wa.link/pkj891",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-10",
+              "name": "feria_zonas",
+              "value": "[{\"nombre\": \"Montero\", \"lat\": -17.3387, \"lon\": -63.2505}, {\"nombre\": \"Warnes\", \"lat\": -17.5103, \"lon\": -63.1647}, {\"nombre\": \"Mineros\", \"lat\": -17.1183, \"lon\": -63.2306}, {\"nombre\": \"Okinawa\", \"lat\": -17.2333, \"lon\": -62.8167}, {\"nombre\": \"Pailón\", \"lat\": -17.659, \"lon\": -62.7197}, {\"nombre\": \"Cuatro Cañadas\", \"lat\": -17.4333, \"lon\": -62.3333}, {\"nombre\": \"San Julián\", \"lat\": -16.9065, \"lon\": -62.6189}, {\"nombre\": \"Yapacaní\", \"lat\": -17.4, \"lon\": -63.8333}, {\"nombre\": \"Portachuelo\", \"lat\": -17.3517, \"lon\": -63.3936}, {\"nombre\": \"Cotoca\", \"lat\": -17.75, \"lon\": -63.05}]",
+              "type": "string"
+            },
+            {
+              "id": "cfg-feria-sectores",
+              "name": "feria_sectores",
+              "type": "string",
+              "value": "[{\"emoji\": \"🔥\", \"nombre\": \"Más visitados\", \"stands\": []}, {\"emoji\": \"🚜\", \"nombre\": \"Maquinaria\", \"stands\": []}, {\"emoji\": \"🌱\", \"nombre\": \"Semillas e insumos\", \"stands\": []}, {\"emoji\": \"🧪\", \"nombre\": \"Agroquímicos\", \"stands\": []}, {\"emoji\": \"🐄\", \"nombre\": \"Ganadería\", \"stands\": []}, {\"emoji\": \"💧\", \"nombre\": \"Riego y tecnología\", \"stands\": []}, {\"emoji\": \"🏦\", \"nombre\": \"Bancos y seguros\", \"stands\": []}, {\"emoji\": \"🍔\", \"nombre\": \"Comidas\", \"stands\": []}]"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        640,
+        464
+      ],
+      "id": "241f1432-1a48-4639-8cc1-5df93e6a4939",
+      "name": "Configuración Global"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Chatwoot envia el texto en body.content\nconst textoOriginal = ($json.body?.content || '').trim();\nconst texto = textoOriginal.toLowerCase();\n// Version sin acentos para comparar palabras clave\nconst t = texto.normalize('NFD').replace(/[̀-ͯ]/g, '');\n\n// \"Dejar de recibir\" / \"Activar alertas\" (botones de la plantilla de alertas) los atiende el flujo\n// \"IAGRO · Seguimiento de estados\": desactiva/activa en el panel y confirma. El bot no responde.\nif (/^(dejar de recibir|no recibir alertas|desactivar alertas|activar alertas|recibir alertas)$/.test(t)) return [];\n\nconst telefonoRaw = $json.body?.conversation?.meta?.sender?.phone_number || '';\nconst telefono = telefonoRaw.replace('+', '');\n\nlet intent = 'desconocido';\nlet codigo = null;\nlet lluvia = null;          // { mm, fecha, lote } cuando se registra lluvia\nlet satelite_tipo = null;   // parcela | nubes | ndvi\nlet lluvia_error = null;\n\n// =====================================================\n// DETECTAR REGISTRO IAGRO\n// Formato esperado:\n// [IAGRO]:[BZuABk2]\n// =====================================================\nconst registroMatch = textoOriginal.match(/^\\s*\\[IAGRO\\]\\s*:\\s*\\[([A-Za-z0-9_-]+)\\]/i);\n\nif (registroMatch) {\n  intent = 'registro';\n  codigo = registroMatch[1];\n}\n\n// =====================================================\n// FERIA AGRO VIDAS + UBICACIÓN DEL LOTE\n// Va antes de las palabras clave: \"FERIA - Quiero el clima de mi zona\" contiene \"clima\"\n// Los botones de WhatsApp llegan con su TÍTULO como texto, por eso se detectan por palabras\n// =====================================================\nlet ubicacion = null;       // { lat, lon, nombre? } del lote, zona elegida o feria\nconst normalizar = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();\n\nlet zonas = [];\ntry { zonas = JSON.parse($json.feria_zonas || '[]'); } catch (e) { zonas = []; }\nconst adjuntoUbicacion = ($json.body?.attachments || []).find(a => a.file_type === 'location' && a.coordinates_lat != null);\nconst zonaElegida = zonas.find(z => normalizar(z.nombre) === t.replace(/^zona\\s+/, '').trim());\n\nlet sectores = [];\ntry { sectores = JSON.parse($json.feria_sectores || '[]'); } catch (e) { sectores = []; }\nconst soloLetras = (s) => normalizar(s).replace(/[^a-z0-9 ]/g, '').trim();\nconst sectorElegido = sectores.find(s => soloLetras(s.nombre) === soloLetras(t));\nlet feria_sector = null;\n\nif (intent === 'desconocido') {\n  if (adjuntoUbicacion) {\n    intent = 'ubicacion';\n    ubicacion = { lat: Number(adjuntoUbicacion.coordinates_lat), lon: Number(adjuntoUbicacion.coordinates_long) };\n  } else if (zonaElegida) {\n    intent = 'feria_zona';\n    ubicacion = { lat: Number(zonaElegida.lat), lon: Number(zonaElegida.lon), nombre: zonaElegida.nombre };\n  } else if (sectorElegido) {\n    intent = 'feria_sector';\n    feria_sector = sectorElegido.nombre;\n  } else if (/\\bguia\\b|sectores|recorrido|\\btour\\b/.test(t)) {\n    intent = 'feria_guia';\n  } else if (/elegir mi zona|lista de zonas|^zonas?$/.test(t)) {\n    intent = 'feria_zonas';\n  } else if (/\\bstand\\b/.test(t)) {\n    intent = 'feria_stand';\n  } else if (/clima (de |en )?(la )?feria/.test(t)) {\n    intent = 'feria_clima';\n  } else if (/invitar|referido/.test(t)) {\n    intent = 'feria_invitar';\n  } else if (/^feria\\b|agro ?vidas/.test(t)) {\n    intent = 'feria';\n  }\n}\n\nif (intent === 'feria' || intent === 'feria_clima') {\n  ubicacion = { lat: Number($json.feria_lat), lon: Number($json.feria_lon), nombre: $json.feria_nombre || 'Agro Vidas' };\n}\n// Endpoint de la API de clima que necesita cada intención de feria (null = no consulta clima)\nconst clima_endpoint = intent === 'feria' ? 'hourly'\n  : ['feria_clima', 'ubicacion', 'feria_zona'].includes(intent) ? 'next24h'\n  : null;\n\n\n// =====================================================\n// REGISTRO RAPIDO DE LLUVIA\n// Ej: \"llovio 15 mm\", \"cayeron 8,5 milimetros ayer en el lote norte\", \"lluvia 12mm 05/10\"\n// =====================================================\nif (intent === 'desconocido' && /(llov|lluvi|cayo|cayeron|registr|anot|pluvio)/.test(t)) {\n  // Fecha explicita dd/mm o dd/mm/aaaa (se quita del texto para no confundirla con los mm)\n  let fecha = $now.toISODate();\n  let resto = t;\n  const fm = t.match(/\\b(\\d{1,2})[\\/-](\\d{1,2})(?:[\\/-](\\d{2,4}))?\\b/);\n  if (fm) {\n    const anio = fm[3] ? (fm[3].length === 2 ? 2000 + Number(fm[3]) : Number(fm[3])) : $now.year;\n    const f = DateTime.fromObject({ year: anio, month: Number(fm[2]), day: Number(fm[1]) });\n    if (f.isValid) fecha = f.toISODate();\n    resto = t.replace(fm[0], ' ');\n  } else if (/antier|anteayer/.test(t)) {\n    fecha = $now.minus({ days: 2 }).toISODate();\n  } else if (/\\bayer\\b|anoche/.test(t)) {\n    fecha = $now.minus({ days: 1 }).toISODate();\n  }\n\n  const conUnidad = resto.match(/(\\d+(?:[.,]\\d+)?)\\s*(mm|milimetros?|ml)\\b/);\n  const soloNumero = /(llovio|llovieron|cayo|cayeron)/.test(resto) ? resto.match(/\\b(\\d+(?:[.,]\\d+)?)\\b/) : null;\n  const m = conUnidad || soloNumero;\n\n  if (m) {\n    const mm = Math.round(parseFloat(m[1].replace(',', '.')) * 10) / 10;\n    const loteMatch = textoOriginal.match(/en\\s+(?:el\\s+|la\\s+)?(lote|parcela|potrero|chacra|campo|sector)\\s+([\\wáéíóúñÁÉÍÓÚÑ-]{1,30})/i);\n    const lote = loteMatch\n      ? `${loteMatch[1].charAt(0).toUpperCase()}${loteMatch[1].slice(1).toLowerCase()} ${loteMatch[2]}`\n      : 'Lote principal';\n\n    if (fecha > $now.toISODate()) {\n      intent = 'lluvia_ayuda';\n      lluvia_error = 'La fecha no puede ser futura.';\n    } else if (mm < 0 || mm > 500) {\n      intent = 'lluvia_ayuda';\n      lluvia_error = 'La cantidad debe estar entre 0 y 500 mm.';\n    } else {\n      intent = 'lluvia_registro';\n      lluvia = { mm, fecha, lote };\n    }\n  }\n}\n\n// =====================================================\n// INTENCIONES NORMALES\n// El orden importa: la primera que coincide gana.\n// (agregar nuevas palabras clave aqui = escala sin tocar el resto del flujo)\n// Las palabras van SIN acentos porque se comparan contra el texto normalizado.\n// =====================================================\nif (intent === 'desconocido') {\n  const intents = {\n    lluvia_historial: ['historial', 'mis lluvias', 'cuanto llovio', 'acumulado', 'mis registros', 'cuaderno'],\n    lluvia_ayuda: ['registrar lluvia', 'anotar lluvia', 'pluviometro', 'registrar'],\n    alertas: ['alerta', 'helada', 'granizo', 'tormenta', 'riesgo', 'peligro'],\n    fumigar: ['fumig', 'pulveriz', 'asperj', 'aplicar'],\n    riego: ['riego', 'regar', 'evapotrans'],\n    viento: ['viento', 'vientos', 'rafaga', 'racha', 'ventarron', 'ventisca'],\n    satelite: ['satel', 'imagen', 'ndvi', 'nubes', 'vegetacion', 'salud del cultivo', 'mi parcela', 'foto'],\n    planes: ['planes', 'plan pro', 'precio', 'premium', 'suscrib', 'pagar', 'costo', 'cuanto cuesta'],\n    pronostico: ['pronostico', 'clima', 'lluvia', 'tiempo', 'llover', 'llueve'],\n    radar: ['radar'],\n    saludo: ['hola', 'buenas', 'buenos dias', 'buen dia'],\n    ayuda: ['ayuda', 'menu', 'opciones'],\n    saludo_final: ['gracias', 'ok', 'perfecto', 'listo', 'entendido', 'hasta luego', 'adios', 'chau', 'nos vemos']\n  };\n\n  for (const [nombre, palabras] of Object.entries(intents)) {\n    if (palabras.some(p => t.includes(p))) {\n      intent = nombre;\n      break;\n    }\n  }\n}\n\nif (intent === 'satelite') {\n  satelite_tipo = /ndvi|vegetacion|salud/.test(t) ? 'ndvi' : /nube/.test(t) ? 'nubes' : 'parcela';\n}\n\n// Intenciones que requieren usuario registrado (pasan por un solo IF)\nconst SERVICIOS = ['lluvia_registro', 'lluvia_historial', 'alertas', 'fumigar', 'riego', 'viento', 'satelite'];\n\nreturn [{\n  json: {\n    ...$json,\n    intent,\n    es_servicio: SERVICIOS.includes(intent) ? 'si' : 'no',\n    texto_original: textoOriginal,\n    texto,\n    codigo,\n    lluvia,\n    lluvia_error,\n    satelite_tipo,\n    ubicacion,\n    clima_endpoint,\n    feria_sector,\n    clima_lat: ubicacion?.lat ?? null,\n    clima_lon: ubicacion?.lon ?? null,\n    conversation_id: $json.body?.conversation?.id,\n    account_id: $json.body?.account?.id,\n    contact_name: $json.body?.conversation?.meta?.sender?.name || 'Cliente',\n    telefono\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        464
+      ],
+      "id": "74b045e6-707e-4255-93eb-7eb6c4638a83",
+      "name": "Parsear Mensaje y Detectar Intención"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-saludo",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "saludo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-pronostico",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "pronostico",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-saludo-final",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "saludo_final",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-registro",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "registro",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-ayuda",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "ayuda",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "85f668cb-cc57-42bc-a34d-cc21fc0e239b",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "radar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-servicio",
+                    "leftValue": "={{ $json.es_servicio }}",
+                    "rightValue": "si",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-planes",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "planes",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-lluvia-ayuda",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "lluvia_ayuda",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-feria",
+                    "leftValue": "={{ $json.intent.startsWith('feria') || $json.intent === 'ubicacion' ? 'feria' : 'otro' }}",
+                    "rightValue": "feria",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        464
+      ],
+      "id": "c1fa159b-1abc-4bdb-a644-e457eaab147d",
+      "name": "Enrutar por Intención"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "users",
+          "mode": "list",
+          "cachedResultName": "users"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "phone_number",
+              "value": "={{ $json.telefono }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1104,
+        448
+      ],
+      "id": "cc9c3811-0244-4bcb-a2c1-3b4f65152297",
+      "name": "Buscar Usuario por Teléfono",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Postgres reemplaza $json con las columnas de la tabla (o vacio si no hay match).\n// Aqui lo recuperamos y lo adjuntamos como un solo objeto \"usuario\", conservando\n// todos los datos del mensaje original (intent, telefono, codigo, etc.)\nconst usuario = $json && $json.id ? $json : {};\nconst original = $('Parsear Mensaje y Detectar Intención').first().json;\n\nreturn [{\n  json: {\n    ...original,\n    usuario\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        464
+      ],
+      "id": "aeb2bad2-fb63-4c66-8240-d152ec00350f",
+      "name": "Adjuntar Datos de Usuario"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\nconst nombre = $json.contact_name || 'Cliente';\nconst registrado = !!$json.usuario?.id;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: `Hola **${nombre}!** 👋\\n\\nSoy *IAGRO*, tu asistente experto en clima para el campo 🌾\\n\\n🌦️ Pronósticos · 🚨 Alertas · 🌧️ Registro de lluvias · 🛰️ Imágenes satelitales · 🧑‍🌾 Consejos de fumigación y riego\\n\\n¿Qué necesitas hoy?`,\n    content_type: 'input_select',\n    content_attributes: {\n      items: registrado\n        ? [\n            { title: '🌦️ Ver pronóstico', value: 'pronostico' },\n            { title: '🚨 Alertas', value: 'alertas' },\n            { title: '📋 Ver menú', value: 'menu' }\n          ]\n        : [\n            { title: '🌦️ Ver pronóstico', value: 'pronostico' },\n            { title: '🌧️ Ver radar', value: 'radar' },\n            { title: '📋 Ver menú', value: 'menu' }\n          ]\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        176
+      ],
+      "id": "8c355603-fd7e-4b82-8ef4-776ac9f23ac9",
+      "name": "Preparar Menú Saludo"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\nconst MENU = [\n  { title: '🌦️ Ver pronóstico', value: 'pronostico' },\n  { title: '🌧️ Ver radar', value: 'radar' },\n  { title: '🚨 Alertas', value: 'alertas' },\n  { title: '🌧️ Registrar lluvia', value: 'registrar lluvia' },\n  { title: '📊 Mis lluvias', value: 'mis lluvias' },\n  { title: '🌬️ Viento por horas', value: 'viento' },\n  { title: '💨 ¿Puedo fumigar?', value: 'fumigar' },\n  { title: '💧 ¿Cuánto regar?', value: 'riego' },\n  { title: '🛰️ Satélite', value: 'satelite' },\n  { title: '⭐ Planes', value: 'planes' }\n];\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: '🌱 *IAGRO - Menú*\\n\\nEscribe o toca una opción:\\n\\n🌦️ *Pronóstico* — clima de los próximos días\\n🌧️ *Radar* — lluvia en tiempo real\\n🚨 *Alertas* — heladas, tormentas, viento, calor\\n🌧️ *Registrar lluvia* — escribe: _llovió 15 mm_\\n📊 *Mis lluvias* — tu historial y acumulados\\n🌬️ *Viento* — velocidad, ráfagas y dirección por hora\\n💨 *Fumigar* — mejores horarios para aplicar\\n💧 *Riego* — cuánta agua necesita tu cultivo\\n🛰️ *Satélite* — parcela, nubes y NDVI\\n⭐ *Planes* — funciones Premium\\n\\n¡Estamos para ayudarte! 🌾',\n    content_type: 'input_select',\n    content_attributes: { items: MENU }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        1376
+      ],
+      "id": "2ebc8d29-4f6a-49a6-8036-83906b8791bc",
+      "name": "Preparar Menú Ayuda"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: '👋 Gracias por usar *IAGRO*.\\n\\nSi necesitas un nuevo pronóstico o información climática, solo escribe:\\n\\n🌦️ *Pronóstico*\\n🌧️ *Radar*\\n📋 *Ayuda*\\n\\n¡Que tengas un excelente día! 🌾'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        784
+      ],
+      "id": "0a0ae83d-9593-4b3b-a6cd-e7d6b04ddbfe",
+      "name": "Preparar Mensaje Despedida"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: '🤔 No entendí tu mensaje.\\n\\nPuedes preguntarme cosas como:\\n• _¿Va a llover?_\\n• _Llovió 20 mm ayer_\\n• _¿Puedo fumigar?_\\n• _¿Hay alertas?_\\n\\nO escribe *Menú* para ver todas las opciones.',\n    content_type: 'input_select',\n    content_attributes: {\n      items: [\n        { title: '🌦️ Ver pronóstico', value: 'pronostico' },\n        { title: '🚨 Alertas', value: 'alertas' },\n        { title: '📋 Ver menú', value: 'menu' }\n      ]\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        1536
+      ],
+      "id": "06695b53-83f9-49d7-b992-c037302b1e22",
+      "name": "Preparar Mensaje No Entendido"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-id-existe",
+              "leftValue": "={{ $json.usuario.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "cond-activo",
+              "leftValue": "={{ $json.usuario.is_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1872,
+        432
+      ],
+      "id": "3427ec44-6425-499c-a548-ae6c0f5ad62e",
+      "name": "¿Usuario Registrado?"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: '⚠️ Aún no tienes una cuenta registrada en **IAGRO**.\\n\\n👉 Por favor, ingresa al siguiente enlace y completa tu registro:\\n\\nhttps://iagro360.xyz/registro\\n\\nUna vez registrado, podrás acceder a los servicios de *IAGRO*. 🌱'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2288,
+        640
+      ],
+      "id": "49d8894b-cf8e-45ae-851a-40b659e72ef2",
+      "name": "Preparar Mensaje No Registrado"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Configuración Global').item.json.weather_api_url }}/forecast/hourly?lat={{ $json.usuario.latitude }}&lon={{ $json.usuario.longitude }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2224,
+        80
+      ],
+      "id": "a8a3b793-4f9d-4441-ae24-1688bf1933ba",
+      "name": "Consultar API Clima",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.data || [];\nconst usuario = $('Buscar Usuario por Teléfono').first().json;\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\n// ===== Ajustes =====\nconst MM_MINIMO = 1;        // menos de esto en el día NO se considera lluvia (para \"Próxima lluvia\")\nconst VIENTO_FUMIGAR = 20;  // km/h: desde aquí no se recomienda fumigar\nconst DIAS_LISTA = 8;       // cuántos días van en \"Próximos días\"\n\n// ===== Funciones auxiliares =====\nconst num = (v) => parseFloat(v);\n\nconst avgWind = (horarios) => {\n  const vals = horarios.map(h => num(h.vsd)).filter(v => !isNaN(v));\n  return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;\n};\n\nconst avgWindDir = (horarios) => {\n  const dirs = horarios.map(h => h.vdId).filter(Boolean);\n  if (!dirs.length) return '';\n  const freq = {};\n  dirs.forEach(d => freq[d] = (freq[d] || 0) + 1);\n  return Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];\n};\n\nconst temps = (horarios) => horarios.map(h => num(h.td)).filter(v => !isNaN(v));\nconst maxTemp = (horarios) => { const t = temps(horarios); return t.length ? Math.round(Math.max(...t)) : '-'; };\nconst minTemp = (horarios) => { const t = temps(horarios); return t.length ? Math.round(Math.min(...t)) : '-'; };\n\nconst totalMm = (horarios) => horarios.reduce((s, h) => s + (num(h.sr) || 0), 0);\n\n// Formato de mm: entero si es grande, 1 decimal si es poco\nconst fmtMm = (mm) => mm >= 1 ? String(Math.round(mm)) : (Math.round(mm * 10) / 10).toFixed(1);\n\nconst parseFecha = (fecha) => {\n  const [dia, mes, anio] = fecha.split('/');\n  return new Date(anio, mes - 1, dia, 12); // evita errores de zona horaria\n};\nconst nombreLargo = (f) => ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][parseFecha(f).getDay()];\nconst nombreCorto = (f) => ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][parseFecha(f).getDay()];\nconst ddmm = (f) => f.slice(0, 5); // \"06/10/2026\" -> \"06/10\"\n\n// ===== Procesar días (hoy + DIAS_LISTA días siguientes) =====\nconst dias = data.slice(0, 1 + DIAS_LISTA).map(dia => {\n  const horarios = dia.horarios || [];\n  const mm = totalMm(horarios);\n  const horasLluvia = horarios.filter(h => num(h.sr) > 0);\n  // Hora de inicio: primera hora con lluvia\n  const primera = horasLluvia[0];\n  // Probabilidad: la máxima de las horas con lluvia\n  const prob = horasLluvia.length ? Math.max(...horasLluvia.map(h => num(h.rp) || 0)) : 0;\n  return {\n    fecha: dia.fecha,\n    minT: minTemp(horarios),\n    maxT: maxTemp(horarios),\n    viento: avgWind(horarios),\n    dir: avgWindDir(horarios),\n    mm,\n    llueve: mm >= MM_MINIMO,\n    lluviaLigera: mm > 0 && mm < MM_MINIMO,\n    horaInicio: primera ? primera.h : null,\n    prob,\n  };\n});\n\n// ===== Armar mensaje =====\nlet mensaje = `🌦️ **${usuario.nombre_propiedad}**\\n`;\n\nif (dias.length) {\n  const hoy = dias[0];\n\n  // HOY\n  mensaje += `\\n📍 *Hoy ${nombreLargo(hoy.fecha)} ${ddmm(hoy.fecha)}*\\n`;\n  mensaje += `🌡️ ${hoy.minT}° / ${hoy.maxT}°C  ·  💨 ${hoy.viento} km/h ${hoy.dir}\\n`;\n\n  // PRÓXIMA LLUVIA (depende del umbral MM_MINIMO)\n  const proxima = dias.find(d => d.llueve);\n  if (proxima) {\n    const cuando = proxima === hoy\n      ? 'hoy'\n      : `${nombreLargo(proxima.fecha)} ${ddmm(proxima.fecha)}`;\n    mensaje += `\\n🌧️ *Próxima lluvia:* ${cuando} desde las ${proxima.horaInicio}\\n`;\n    mensaje += `Se esperan unos ${Math.round(proxima.mm)} mm (probabilidad ${proxima.prob}%)\\n`;\n  } else {\n    mensaje += `\\n☀️ *Sin lluvias importantes en los próximos días*\\n`;\n  }\n\n  // PRÓXIMOS DÍAS (una línea por día)\n  mensaje += `\\n📅 *Próximos días*\\n`;\n  for (const d of dias.slice(1, 1 + DIAS_LISTA)) {\n    let icono, extra;\n    if (d.llueve) {\n      icono = '🌧️';\n      extra = `💧 ${fmtMm(d.mm)} mm`;\n    } else if (d.lluviaLigera) {\n      icono = '🌦️';\n      extra = `💧 ${fmtMm(d.mm)} mm`;\n    } else {\n      icono = '☀️';\n      extra = `💨 ${d.viento}`;\n    }\n    mensaje += `${nombreCorto(d.fecha)} ${ddmm(d.fecha)} ${icono} ${d.minT}°–${d.maxT}° ${extra}\\n`;\n  }\n\n  // RECOMENDACIÓN\n  const proximos3 = dias.slice(0, 3);\n  const ventosos = proximos3.filter(d => d.viento >= VIENTO_FUMIGAR).length;\n  const calorExtremo = proximos3.some(d => d.maxT !== '-' && d.maxT > 35);\n  const frio = proximos3.some(d => d.minT !== '-' && d.minT < 16);\n\n  const avisos = [];\n  if (proxima && proxima !== hoy) {\n    const diasSecos = dias.indexOf(proxima);\n    if (diasSecos >= 2) avisos.push(`${diasSecos} días secos antes de la lluvia`);\n  }\n  if (ventosos >= 2) avisos.push('⚠️ viento fuerte, no recomendable fumigar');\n  else if (!proxima || proxima !== hoy) avisos.push('✅ buen momento para aplicaciones en días de poco viento');\n  if (calorExtremo) avisos.push('🌡️ calor extremo');\n  if (frio) avisos.push('🥶 temperaturas frías');\n\n  if (avisos.length) mensaje += `\\n💡 *Resumen:* ${avisos.join(' · ')}\\n`;\n}\n\nmensaje += `\\n🌐 Radar en vivo: https://iagro360.xyz/radar/${usuario.id}\\n`;\nmensaje += `\\n📡 _IAGRO | Monitoreo Climático Inteligente_`;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: mensaje,\n    content_type: 'input_select',\n    content_attributes: {\n      items: [\n        { title: '🌦️ Ver pronóstico', value: 'pronostico' },\n        { title: '🌧️ Ver radar', value: 'radar' }\n      ]\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2896,
+        -208
+      ],
+      "id": "e325ee49-e333-4c06-b713-d93cc85a8fb7",
+      "name": "Formatear Pronóstico + Radar"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: '⚠️ No pudimos obtener el pronóstico en este momento. Por favor, intenta nuevamente en unos minutos. 🙏'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        176
+      ],
+      "id": "748f70d4-1dcd-4e02-8f2a-00b431f34cff",
+      "name": "Preparar Mensaje Error Clima"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "user_tmp",
+          "mode": "list",
+          "cachedResultName": "user_tmp"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "codigo",
+              "value": "={{ $json.codigo }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1344,
+        1152
+      ],
+      "id": "d26712c0-58ab-49b5-8817-6aba48bc1ad4",
+      "name": "Buscar Código Temporal",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-codigo-valido",
+              "leftValue": "={{ $json.codigo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        1152
+      ],
+      "id": "32d971f4-8bae-4174-a99d-f01019642f00",
+      "name": "¿Código Válido?"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: '❌ *IAGRO*\\n\\nNo pudimos validar tu código de registro. Verifica que el mensaje no haya sido modificado e intenta nuevamente, o contacta a soporte.'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        1296
+      ],
+      "id": "bfb9ddf4-6f47-4263-9ffb-fd679810f7f6",
+      "name": "Preparar Mensaje Código Inválido"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn [{\n  json: {\n    ...$json,\n    telefono: $('Parsear Mensaje y Detectar Intención').first().json.telefono\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        1056
+      ],
+      "id": "72df2e2d-29b5-4a83-aceb-802cf9bf0662",
+      "name": "Adjuntar Teléfono al Registro"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-id-vacio",
+              "leftValue": "={{ $('Adjuntar Datos de Usuario').first().json.usuario.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2016,
+        1056
+      ],
+      "id": "ba96196d-5025-4c01-8404-0832dafa601f",
+      "name": "¿Teléfono Ya Registrado?"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: '🌱 *IAGRO*\\n\\n⚠️ Este número ya tiene una cuenta registrada.\\n\\nSi crees que esto es un error, contacta a soporte.'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        1216
+      ],
+      "id": "abbfbfee-3f46-4922-a7e1-a4edfd133a2a",
+      "name": "Preparar Mensaje Ya Registrado"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "users",
+          "mode": "list",
+          "cachedResultName": "users"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "is_active": true,
+            "sensor_code": "EP999",
+            "latitude": "={{ $('Adjuntar Teléfono al Registro').first().json.lat }}",
+            "longitude": "={{ $('Adjuntar Teléfono al Registro').first().json.lng }}",
+            "phone_number": "={{ $('Adjuntar Teléfono al Registro').first().json.telefono }}",
+            "nombre_propiedad": "={{ $('Adjuntar Teléfono al Registro').first().json.nombre }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone_number",
+              "displayName": "phone_number",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sensor_code",
+              "displayName": "sensor_code",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "is_active",
+              "displayName": "is_active",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "latitude",
+              "displayName": "latitude",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "longitude",
+              "displayName": "longitude",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nombre_propiedad",
+              "displayName": "nombre_propiedad",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2464,
+        976
+      ],
+      "id": "288c181e-215d-496f-a7f3-80047eed5b52",
+      "name": "Insertar Nuevo Usuario",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: '🌱 *IAGRO*\\n\\n✅ *¡Registro exitoso!*\\n\\n¿Qué deseas hacer ahora?',\n    content_type: 'input_select',\n    content_attributes: {\n      items: [\n        { title: '🌦️ Ver pronóstico', value: 'pronostico' },\n        { title: '🌧️ Ver radar', value: 'radar' },\n        { title: '⚙️ Configuración', value: 'configuracion' }\n      ]\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        976
+      ],
+      "id": "5a54865a-f1ef-40f1-84e7-808447bd8ff8",
+      "name": "Preparar Mensaje Registro Exitoso"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Procesa todos los items: una rama puede enviar más de un mensaje (ej. viento)\nreturn $input.all().map(({ json }) => {\n  const payload = {\n    content: json.content,\n    message_type: 'outgoing',\n    private: false\n  };\n\n  if (json.content_type) payload.content_type = json.content_type;\n  if (json.content_attributes) payload.content_attributes = json.content_attributes;\n\n  return {\n    json: {\n      conversation_id: json.conversation_id,\n      chatwoot_payload: payload\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2976,
+        656
+      ],
+      "id": "bd09e8b0-5e3d-4b02-b1a6-ab5b10e76605",
+      "name": "Normalizar Payload Saliente"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuración Global').first().json.chatwoot_base_url }}/accounts/{{ $('Configuración Global').first().json.chatwoot_account_id }}/conversations/{{ $json.conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.chatwoot_payload) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 800
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3200,
+        656
+      ],
+      "id": "4e569db2-30d3-4e3c-bfdb-355b5137d852",
+      "name": "Enviar Mensaje Chatwoot",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## 1. Recepción y Parsing\nWebhook de Chatwoot → filtra solo mensajes entrantes → carga configuración global (URLs/IDs centralizados) → detecta intención del texto.",
+        "height": 260,
+        "width": 620,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        96
+      ],
+      "id": "5b80602e-4439-4188-9b98-9fbcbfb8be4b",
+      "name": "Nota - s1"
+    },
+    {
+      "parameters": {
+        "content": "## Lookup único de usuario\nSe consulta el teléfono en 'users' **una sola vez, antes del Switch**. Cualquier rama (actual o futura) lee el resultado desde $json.usuario en vez de volver a consultar la BD. Esto evita duplicar la misma query en pronóstico y en registro.",
+        "height": 200,
+        "width": 700,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        -144
+      ],
+      "id": "6662c5ce-f2e6-4202-b51d-b506314cd8aa",
+      "name": "Nota - s1b"
+    },
+    {
+      "parameters": {
+        "content": "## 2. Enrutamiento\nEl Switch usa **fallback real** (\"extra\"): cualquier intención nueva o no reconocida cae automáticamente en 'No Entendido' sin romper el flujo.",
+        "height": 136,
+        "width": 292,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        144
+      ],
+      "id": "a3e662c9-014b-4aa3-b8d9-bbf2fc1971c5",
+      "name": "Nota - s2"
+    },
+    {
+      "parameters": {
+        "content": "## 3. Pronóstico\nYa no consulta la BD (reusa el lookup único). Si la API de clima falla, el error se captura (onError) y se envía un mensaje de disculpa en vez de dejar al usuario sin respuesta.",
+        "height": 180,
+        "width": 500,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        -192
+      ],
+      "id": "400934e3-87b8-449a-b1a4-ceb8a75d5b35",
+      "name": "Nota - s3"
+    },
+    {
+      "parameters": {
+        "content": "## 4. Registro\nValida código temporal → reusa el lookup único para saber si el teléfono ya tiene cuenta (sin query extra) → inserta usuario → confirma. sensor_code='EP999' es un placeholder: revisar si se debe asignar dinámicamente.",
+        "width": 900,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        1568
+      ],
+      "id": "3d50cd5e-0a78-4a93-83f9-4c56af715f94",
+      "name": "Nota - s4"
+    },
+    {
+      "parameters": {
+        "content": "## 5. Envío Unificado\nTodas las ramas terminan aquí. Para agregar una nueva respuesta solo se crea 1 nodo Code que entregue {conversation_id, content, content_type?, content_attributes?} y se conecta aquí. No se duplica lógica de envío.",
+        "height": 260,
+        "width": 500,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2976,
+        368
+      ],
+      "id": "b9d36e7a-6be4-4e1f-b740-518bdc207ba2",
+      "name": "Nota - s5"
+    },
+    {
+      "parameters": {
+        "content": "## ⚠️ Configurar antes de usar\n1) Crear credencial 'HTTP Header Auth' llamada 'Chatwoot API Token' con header 'api_access_token' = tu token, y seleccionarla en 'Enviar Mensaje Chatwoot'.\n2) Revisar valores en 'Configuración Global'.\n3) Verificar credencial Postgres existente.",
+        "height": 260,
+        "width": 420,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3488,
+        384
+      ],
+      "id": "385d5b6d-815a-412e-99fb-b30e1c09e82d",
+      "name": "Nota - s6"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-id-existe",
+              "leftValue": "={{ $json.usuario.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "cond-activo",
+              "leftValue": "={{ $json.usuario.is_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1856,
+        608
+      ],
+      "id": "d978e197-fd7b-4fe7-84cb-c8ce851844d4",
+      "name": "¿Usuario Registrado?1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const usuario = $('Buscar Usuario por Teléfono').first().json;\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\nconst mensaje = `🌧️ *Radar de lluvias en tiempo real*\n\n📍 Consulta la actividad de lluvias en tu zona desde el radar:\n\n👉 https://iagro360.xyz/radar/${usuario.id}\n\n📡 _IAGRO | Monitoreo Climático Inteligente_`;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: mensaje,\n    content_type: 'input_select',\n    content_attributes: {\n      items: [\n        { title: '🌦️ Ver pronóstico', value: 'pronostico' },\n        { title: '🌧️ Ver radar', value: 'radar' }\n      ]\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2576,
+        368
+      ],
+      "id": "d0fe9997-dbe5-4709-90bc-e020545fca7a",
+      "name": "Preparar Mensaje Radar"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-id-existe",
+              "leftValue": "={{ $json.usuario.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "cond-activo",
+              "leftValue": "={{ $json.usuario.is_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1872,
+        2176
+      ],
+      "id": "d1af5ca4-3320-4679-baf7-f745233df6b9",
+      "name": "¿Usuario Registrado? (Servicios)"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "s-lluvia-reg",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "lluvia_registro",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "s-lluvia-hist",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "lluvia_historial",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "s-clima",
+                    "leftValue": "={{ ['alertas','fumigar','riego'].includes($json.intent) ? 'clima' : 'otro' }}",
+                    "rightValue": "clima",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "s-satelite",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "satelite",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "s-viento",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "viento",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2112,
+        2176
+      ],
+      "id": "723522b6-3794-4e21-9d05-9f5af091295d",
+      "name": "Enrutar Servicios"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH ins AS (\n  INSERT INTO public.rain_records (user_id, fecha, mm, lote)\n  VALUES ($1::bigint, $2::date, $3::numeric, $4)\n  RETURNING fecha, mm\n)\nSELECT\n  ins.fecha,\n  ins.mm,\n  ins.mm + COALESCE((SELECT SUM(r.mm) FROM public.rain_records r\n                     WHERE r.user_id = $1::bigint\n                       AND date_trunc('month', r.fecha) = date_trunc('month', ins.fecha)), 0) AS total_mes,\n  ins.mm + COALESCE((SELECT SUM(r.mm) FROM public.rain_records r\n                     WHERE r.user_id = $1::bigint\n                       AND date_trunc('year', r.fecha) = date_trunc('year', ins.fecha)), 0) AS total_anio,\n  1 + (SELECT COUNT(*) FROM public.rain_records r WHERE r.user_id = $1::bigint) AS registros\nFROM ins;",
+        "options": {
+          "queryReplacement": "={{ $json.usuario.id }},{{ $json.lluvia.fecha }},{{ $json.lluvia.mm }},{{ $json.lluvia.lote }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2432,
+        1888
+      ],
+      "id": "df9c4b34-73f7-4e0f-bb7c-ccadb289ed83",
+      "name": "Guardar Lluvia",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Viene de \"Guardar Lluvia\" (INSERT + totales en una sola consulta)\nconst r = $json;\nconst ctx = $('Adjuntar Datos de Usuario').first().json;\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\nconst num = (v) => Number(v || 0);\nconst fmt = (v) => num(v).toLocaleString('es', { maximumFractionDigits: 1 });\nconst mm = num(ctx.lluvia.mm);\nconst f = DateTime.fromISO(ctx.lluvia.fecha).setLocale('es');\nconst fecha = f.toFormat(\"cccc d 'de' LLLL\");\nconst mes = f.toFormat('LLLL');\n\nlet consejo;\nif (mm >= 40) consejo = '⛈️ Fue un aguacero fuerte. Revisa encharcamientos y erosión; espera a que el suelo drene antes de entrar con maquinaria.';\nelse if (mm >= 15) consejo = '💚 Muy buena lluvia. El suelo debería tener humedad para varios días: puedes suspender el riego.';\nelse if (mm >= 5) consejo = '🌱 Lluvia moderada. Ayuda, pero quizá necesites riego complementario pronto.';\nelse consejo = '💧 Lluvia ligera: moja la superficie pero casi no llega a las raíces.';\n\nconst mensaje = `✅ *Lluvia registrada*\\n\\n📅 ${fecha}\\n📍 ${ctx.lluvia.lote}\\n🌧️ *${fmt(mm)} mm* ≈ ${(mm * 10000).toLocaleString('es')} litros por hectárea\\n\\n📊 *Acumulados*\\n• Mes de ${mes}: *${fmt(r.total_mes)} mm*\\n• Año ${f.year}: *${fmt(r.total_anio)} mm*\\n• Registros: ${r.registros}\\n\\n🤖 ${consejo}`;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: mensaje,\n    content_type: 'input_select',\n    content_attributes: {\n      items: [\n        { title: '📊 Mis lluvias', value: 'mis lluvias' },\n        { title: '💧 ¿Cuánto regar?', value: 'riego' },\n        { title: '📋 Ver menú', value: 'menu' }\n      ]\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2672,
+        1808
+      ],
+      "id": "6c100762-478c-414d-a705-a1dd05d03b1b",
+      "name": "Formatear Registro Lluvia"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  COUNT(*) AS registros,\n  COALESCE(SUM(mm) FILTER (WHERE date_trunc('month', fecha) = date_trunc('month', CURRENT_DATE)), 0) AS total_mes,\n  COALESCE(SUM(mm) FILTER (WHERE date_trunc('year', fecha) = date_trunc('year', CURRENT_DATE)), 0) AS total_anio,\n  COALESCE(SUM(mm) FILTER (WHERE fecha >= CURRENT_DATE - 30), 0) AS total_30d,\n  (SELECT json_agg(u) FROM (\n     SELECT fecha, mm, lote FROM public.rain_records\n     WHERE user_id = $1::bigint ORDER BY fecha DESC, id DESC LIMIT 5) u) AS ultimos,\n  (SELECT json_agg(m) FROM (\n     SELECT to_char(date_trunc('month', fecha), 'YYYY-MM') AS mes, SUM(mm) AS total\n     FROM public.rain_records\n     WHERE user_id = $1::bigint AND fecha >= date_trunc('month', CURRENT_DATE) - interval '5 months'\n     GROUP BY 1) m) AS meses\nFROM public.rain_records\nWHERE user_id = $1::bigint;",
+        "options": {
+          "queryReplacement": "={{ $json.usuario.id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2432,
+        2080
+      ],
+      "id": "c0a46ea3-727b-491b-9431-75360fe3f692",
+      "name": "Consultar Historial Lluvias",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Viene de \"Consultar Historial Lluvias\" (una fila con agregados)\nconst r = $json;\nconst conversationId = $('Webhook').item.json.body.conversation.id;\nconst num = (v) => Number(v || 0);\nconst fmt = (v) => num(v).toLocaleString('es', { maximumFractionDigits: 1 });\n\nif (!num(r.registros)) {\n  return [{\n    json: {\n      conversation_id: conversationId,\n      content: '📒 Aún no tienes lluvias registradas.\\n\\nCada vez que llueva escríbeme, por ejemplo: _llovió 12 mm_ o _llovió 8 mm ayer en el lote norte_, y yo llevo tu cuaderno de campo con los acumulados del mes y del año.'\n    }\n  }];\n}\n\nconst parse = (v) => (typeof v === 'string' ? JSON.parse(v) : v) || [];\nconst ultimos = parse(r.ultimos);\nconst meses = parse(r.meses);\n\n// Últimos 6 meses (incluye meses sin lluvia) con barras de texto\nconst nombres = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];\nconst filas = [];\nfor (let i = 5; i >= 0; i--) {\n  const d = $now.minus({ months: i });\n  const key = d.toFormat('yyyy-LL');\n  const total = num((meses.find(m => m.mes === key) || {}).total);\n  filas.push({ label: nombres[d.month - 1], total });\n}\nconst max = Math.max(1, ...filas.map(f => f.total));\nconst barras = filas\n  .map(f => `${f.label} ${'▇'.repeat(Math.round((f.total / max) * 10)) || '▁'} ${fmt(f.total)}`)\n  .join('\\n');\n\nconst lista = ultimos\n  .map(u => `• ${DateTime.fromISO(String(u.fecha).slice(0, 10)).toFormat('dd/LL')} — *${fmt(u.mm)} mm* (${u.lote})`)\n  .join('\\n');\n\nconst mensaje = `📊 *Tu cuaderno de lluvias*\\n\\n🗓️ Este mes: *${fmt(r.total_mes)} mm*\\n📆 Este año: *${fmt(r.total_anio)} mm*\\n⏱️ Últimos 30 días: *${fmt(r.total_30d)} mm*\\n🧾 Registros: ${r.registros}\\n\\n📈 *Últimos 6 meses (mm)*\\n${barras}\\n\\n🕐 *Últimos registros*\\n${lista}`;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: mensaje,\n    content_type: 'input_select',\n    content_attributes: {\n      items: [\n        { title: '🌧️ Registrar lluvia', value: 'registrar lluvia' },\n        { title: '💧 ¿Cuánto regar?', value: 'riego' },\n        { title: '📋 Ver menú', value: 'menu' }\n      ]\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2672,
+        2048
+      ],
+      "id": "849e92ce-b038-4ecf-bef5-de442fe0f34e",
+      "name": "Formatear Historial Lluvias"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: '⚠️ No pudimos acceder a tu registro de lluvias en este momento. Por favor, intenta nuevamente en unos minutos. 🙏'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2672,
+        2208
+      ],
+      "id": "35b861ed-2153-47d3-b913-31803e13cefa",
+      "name": "Preparar Mensaje Error BD"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.open-meteo.com/v1/forecast?latitude={{ $json.usuario.latitude }}&longitude={{ $json.usuario.longitude }}&timezone=auto&forecast_days=7&wind_speed_unit=kmh&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,uv_index_max,et0_fao_evapotranspiration&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,wind_speed_10m",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2432,
+        2320
+      ],
+      "id": "c903f490-a3c0-48d3-8fed-741f100da796",
+      "name": "Consultar Clima Agro (Open-Meteo)",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analiza datos de Open-Meteo para: alertas | fumigar | riego\nconst d = $json.daily || {};\nconst h = $json.hourly || {};\nconst ctx = $('Adjuntar Datos de Usuario').first().json;\nconst usuario = ctx.usuario || {};\nconst intent = ctx.intent;\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\n// ===== Umbrales (ajustables) =====\nconst HELADA = 2;          // °C mínima\nconst LLUVIA_FUERTE = 20;  // mm/día\nconst RAFAGA = 50;         // km/h\nconst CALOR = 34;          // °C máxima\nconst UV_EXTREMO = 11;\nconst KC = 1.0;            // coeficiente de cultivo genérico (maíz 1.15, papa 1.1, café 0.95...)\n\nconst r = (v) => Math.round(Number(v) || 0);\nconst fmt = (v) => (Number(v) || 0).toLocaleString('es', { maximumFractionDigits: 1 });\nconst DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];\nconst nombreDia = (iso, i) => i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : `${DIAS[new Date(iso + 'T12:00').getDay()]} ${iso.slice(8, 10)}/${iso.slice(5, 7)}`;\nconst finca = usuario.nombre_propiedad || 'tu campo';\n\n// Hora local actual de la ubicación (Open-Meteo devuelve utc_offset_seconds)\nconst ahoraLocal = new Date(Date.now() + ($json.utc_offset_seconds || 0) * 1000).toISOString().slice(0, 13) + ':00';\nlet i0 = (h.time || []).indexOf(ahoraLocal);\nif (i0 < 0) i0 = 0;\n\nlet mensaje = '';\nlet botones = [];\n\n// =====================================================\n// ALERTAS (7 días)\n// =====================================================\nif (intent === 'alertas') {\n  const alertas = [];\n  (d.time || []).forEach((fecha, i) => {\n    const dia = nombreDia(fecha, i);\n    const tmin = d.temperature_2m_min[i], tmax = d.temperature_2m_max[i];\n    const lluvia = d.precipitation_sum[i], rafaga = d.wind_gusts_10m_max[i];\n    const code = d.weather_code[i], uv = d.uv_index_max[i];\n    if (tmin <= HELADA) alertas.push(`${tmin <= 0 ? '🔴' : '🟠'} 🥶 *Helada — ${dia}*: mínima ${fmt(tmin)} °C. Riega la tarde anterior, cubre almácigos y evita podas.`);\n    if (lluvia >= LLUVIA_FUERTE) alertas.push(`${lluvia >= 50 ? '🔴' : '🟠'} 🌧️ *Lluvia intensa — ${dia}*: ${fmt(lluvia)} mm. Limpia canales y posterga fertilización y fumigación.`);\n    if ([95, 96, 99].includes(code)) alertas.push(`🔴 ⛈️ *${code >= 96 ? 'Tormenta con granizo' : 'Tormenta eléctrica'} — ${dia}*. Evita trabajar en campo abierto.`);\n    if (rafaga >= RAFAGA) alertas.push(`${rafaga >= 75 ? '🔴' : '🟡'} 💨 *Viento fuerte — ${dia}*: ráfagas de ${r(rafaga)} km/h. Asegura invernaderos y tutores.`);\n    if (tmax >= CALOR) alertas.push(`${tmax >= 38 ? '🔴' : '🟠'} 🔥 *Calor extremo — ${dia}*: máxima ${fmt(tmax)} °C. Riega temprano y protege a trabajadores y animales.`);\n    if (uv >= UV_EXTREMO) alertas.push(`🟡 ☀️ *UV extremo — ${dia}*: índice ${fmt(uv)}. Evita exposición al mediodía.`);\n  });\n\n  if (alertas.length) {\n    mensaje = `🚨 *${alertas.length} alerta${alertas.length > 1 ? 's' : ''} para ${finca}* (7 días)\\n\\n${alertas.slice(0, 8).join('\\n\\n')}`;\n  } else {\n    mensaje = `✅ *Sin alertas climáticas para ${finca}*\\n\\nNo detecto heladas, lluvias intensas, tormentas, vientos fuertes ni calor extremo en los próximos 7 días. 🌾`;\n  }\n  mensaje += `\\n\\n🌡️ Mínima más baja: ${fmt(Math.min(...d.temperature_2m_min))} °C · Máxima más alta: ${fmt(Math.max(...d.temperature_2m_max))} °C`;\n  botones = [\n    { title: '💨 ¿Puedo fumigar?', value: 'fumigar' },\n    { title: '🌦️ Ver pronóstico', value: 'pronostico' },\n    { title: '📋 Ver menú', value: 'menu' }\n  ];\n}\n\n// =====================================================\n// VENTANAS DE FUMIGACIÓN (48 h)\n// =====================================================\nif (intent === 'fumigar') {\n  const apta = (i) => {\n    const hr = Number(h.time[i].slice(11, 13));\n    const ws = h.wind_speed_10m[i], pp = h.precipitation_probability[i] ?? 0;\n    const tt = h.temperature_2m[i], hr2 = h.relative_humidity_2m[i];\n    const lluviaPronto = (h.precipitation_probability.slice(i, i + 4)).some(p => p >= 50);\n    return hr >= 6 && hr <= 18 && ws >= 3 && ws < 15 && pp < 30 && tt >= 10 && tt <= 28 && hr2 >= 45 && !lluviaPronto;\n  };\n\n  const ventanas = [];\n  let cur = null;\n  for (let i = i0; i < Math.min(i0 + 48, h.time.length); i++) {\n    if (apta(i)) { if (!cur) cur = { s: i, e: i }; else cur.e = i; }\n    else if (cur) { ventanas.push(cur); cur = null; }\n  }\n  if (cur) ventanas.push(cur);\n  const buenas = ventanas.filter(w => w.e - w.s >= 1).slice(0, 3);\n\n  const etiqueta = (i) => {\n    const off = Math.round((Date.parse(h.time[i].slice(0, 10)) - Date.parse(h.time[i0].slice(0, 10))) / 864e5);\n    return `${off === 0 ? 'Hoy' : off === 1 ? 'Mañana' : 'Pasado mañana'} ${h.time[i].slice(11, 16)}`;\n  };\n\n  const ahora = apta(i0)\n    ? `✅ *Ahora puedes aplicar*\\nViento ${r(h.wind_speed_10m[i0])} km/h · Humedad ${r(h.relative_humidity_2m[i0])}% · ${r(h.temperature_2m[i0])} °C`\n    : `⛔ *Ahora no es recomendable*\\nViento ${r(h.wind_speed_10m[i0])} km/h · Lluvia ${r(h.precipitation_probability[i0])}% · ${r(h.temperature_2m[i0])} °C · HR ${r(h.relative_humidity_2m[i0])}%`;\n\n  const lista = buenas.length\n    ? buenas.map(w => `🟢 ${etiqueta(w.s)} → ${h.time[w.e].slice(11, 16)} (${w.e - w.s + 1} h)`).join('\\n')\n    : '😕 No encontré ventanas seguras en las próximas 48 h.';\n\n  mensaje = `💨 *Ventanas de fumigación — ${finca}*\\n\\n${ahora}\\n\\n📋 *Mejores horarios (48 h)*\\n${lista}\\n\\n_Criterios: viento 3–15 km/h, sin lluvia en las 4 h siguientes, 10–28 °C y humedad ≥ 45 % para reducir deriva y evaporación._`;\n  botones = [\n    { title: '🚨 Alertas', value: 'alertas' },\n    { title: '💧 ¿Cuánto regar?', value: 'riego' },\n    { title: '📋 Ver menú', value: 'menu' }\n  ];\n}\n\n// =====================================================\n// RIEGO: balance hídrico 7 días (ET0 FAO-56)\n// =====================================================\nif (intent === 'riego') {\n  const et0 = (d.et0_fao_evapotranspiration || []).reduce((a, b) => a + (b || 0), 0);\n  const etc = et0 * KC;\n  const lluviaEfectiva = (d.precipitation_sum || []).reduce((a, b) => a + (b || 0), 0) * 0.8;\n  const deficit = Math.max(0, etc - lluviaEfectiva);\n  const m3ha = deficit * 10; // 1 mm = 10 m³/ha\n\n  const recomendacion = deficit < 3\n    ? '🎉 No necesitas regar esta semana: la lluvia prevista cubre la demanda del cultivo.'\n    : `Aplica unos *${fmt(deficit)} mm* en la semana ≈ *${fmt(m3ha)} m³ por hectárea*. Divide en 2–3 riegos, de preferencia temprano en la mañana.`;\n\n  mensaje = `💧 *Balance hídrico — ${finca}* (7 días)\\n\\n🌡️ Evapotranspiración del cultivo: ${fmt(etc)} mm\\n🌧️ Lluvia efectiva prevista: ${fmt(lluviaEfectiva)} mm\\n➖ *Déficit: ${fmt(deficit)} mm*\\n\\n🤖 ${recomendacion}\\n\\n_Cálculo FAO-56 con coeficiente de cultivo genérico (Kc ${KC})._`;\n  botones = [\n    { title: '🌧️ Registrar lluvia', value: 'registrar lluvia' },\n    { title: '🌦️ Ver pronóstico', value: 'pronostico' },\n    { title: '📋 Ver menú', value: 'menu' }\n  ];\n}\n\nconst content = mensaje + `\\n\\n📡 _IAGRO | Monitoreo Climático Inteligente_`;\n\n// WhatsApp rechaza mensajes con botones si el texto supera 1024 caracteres\nif (content.length > 1000) {\n  return [{ json: { conversation_id: conversationId, content } }];\n}\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content,\n    content_type: 'input_select',\n    content_attributes: { items: botones }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2672,
+        2368
+      ],
+      "id": "fb38e598-0b65-4ad6-91b5-14892a51a59e",
+      "name": "Analizar Clima Agro"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construye la URL de la imagen satelital según lo que pidió el usuario\nconst ctx = $json;\nconst u = ctx.usuario || {};\nconst lat = Number(u.latitude), lon = Number(u.longitude);\nconst tipo = ctx.satelite_tipo || 'parcela';\nconst conversationId = $('Webhook').item.json.body.conversation.id;\nconst finca = u.nombre_propiedad || 'tu campo';\nconst ayer = $now.minus({ days: 1 }).toISODate();\n\n// Recuadro alrededor del punto (grados)\nconst bbox = (dLat, dLon) => ({ s: lat - dLat, n: lat + dLat, w: lon - dLon, e: lon + dLon });\nconst gibs = (capa, b, formato, fecha) =>\n  'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0' +\n  `&LAYERS=${capa}&STYLES=&CRS=EPSG:4326&BBOX=${b.s},${b.w},${b.n},${b.e}&WIDTH=800&HEIGHT=800&FORMAT=${formato}` +\n  (fecha ? `&TIME=${fecha}` : '');\n\nlet image_url, filename, caption;\n\nif (tipo === 'nubes') {\n  image_url = gibs('MODIS_Terra_CorrectedReflectance_TrueColor', bbox(2.5, 2.5), 'image/jpeg', ayer);\n  filename = `nubes_${ayer}.jpg`;\n  caption = `☁️ *Nubosidad sobre tu región* — satélite MODIS (NASA), ${DateTime.fromISO(ayer).toFormat('dd/LL/yyyy')}\\n\\n📍 ${finca} está en el *centro* de la imagen (≈ 550 km de lado). Las zonas blancas son nubes y sistemas de lluvia.`;\n} else if (tipo === 'ndvi') {\n  image_url = gibs('MODIS_Terra_NDVI_8Day', bbox(0.25, 0.25), 'image/png');\n  filename = 'ndvi.png';\n  caption = `🌱 *NDVI — salud de la vegetación* (MODIS NASA, compuesto de 8 días)\\n\\n📍 ${finca} está en el *centro* (≈ 55 km de lado).\\n🟩 Verde intenso = vegetación vigorosa\\n🟨 Verde claro = vigor medio\\n🟫 Marrón = suelo desnudo o vegetación estresada\\n\\n_Resolución 250 m: ideal para ver tendencias de la zona._`;\n} else {\n  const b = bbox(0.004, 0.006);\n  image_url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export' +\n    `?bbox=${b.w},${b.s},${b.e},${b.n}&bboxSR=4326&imageSR=3857&size=800,600&format=jpg&f=image`;\n  filename = 'parcela.jpg';\n  caption = `🛰️ *Vista satelital de ${finca}*\\n\\n📍 Tu campo está en el *centro* de la imagen (≈ 1,3 km de lado).\\n📌 Coordenadas: ${lat.toFixed(5)}, ${lon.toFixed(5)}\\n\\n_Imagen de alta resolución (Esri World Imagery); puede tener algunos meses de antigüedad._`;\n}\n\nreturn [{\n  json: { conversation_id: conversationId, image_url, filename, caption, tipo }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2432,
+        2560
+      ],
+      "id": "70beeda5-f1ca-47ce-9074-962ebf8fa64f",
+      "name": "Preparar Imagen Satelital"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.image_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2672,
+        2560
+      ],
+      "id": "e3e9efa9-b72b-40a0-b8c2-9f3b0ef4e572",
+      "name": "Descargar Imagen Satelital",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pone nombre y extensión correctos al archivo descargado (las URLs de WMS terminan en \"wms.cgi\")\nconst item = $input.first();\nconst prep = $('Preparar Imagen Satelital').first().json;\nif (item.binary && item.binary.data) {\n  item.binary.data.fileName = prep.filename;\n  item.binary.data.fileExtension = prep.filename.split('.').pop();\n  item.binary.data.mimeType = prep.filename.endsWith('.png') ? 'image/png' : 'image/jpeg';\n}\nreturn [item];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        2528
+      ],
+      "id": "1532dce7-1f64-4cc9-a9e8-b713366d426c",
+      "name": "Nombrar Archivo Imagen"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuración Global').item.json.chatwoot_base_url }}/accounts/{{ $('Configuración Global').item.json.chatwoot_account_id }}/conversations/{{ $('Preparar Imagen Satelital').item.json.conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "={{ $('Preparar Imagen Satelital').item.json.caption }}"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            },
+            {
+              "name": "private",
+              "value": "false"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "attachments[]",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3152,
+        2528
+      ],
+      "id": "abec8ef5-573c-4d54-8a9d-ea61ea0987f7",
+      "name": "Enviar Imagen Chatwoot",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Después de enviar la imagen, ofrece las otras capas\nconst prep = $('Preparar Imagen Satelital').first().json;\nconst opciones = [\n  { title: '🛰️ Mi parcela', value: 'satelite parcela', tipo: 'parcela' },\n  { title: '☁️ Nubes hoy', value: 'satelite nubes', tipo: 'nubes' },\n  { title: '🌱 NDVI', value: 'satelite ndvi', tipo: 'ndvi' }\n].filter(o => o.tipo !== prep.tipo).map(({ title, value }) => ({ title, value }));\n\nreturn [{\n  json: {\n    conversation_id: prep.conversation_id,\n    content: '¿Quieres ver otra capa satelital? 🛰️',\n    content_type: 'input_select',\n    content_attributes: {\n      items: [...opciones, { title: '📋 Ver menú', value: 'menu' }]\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3392,
+        2528
+      ],
+      "id": "497cdd18-efd5-4266-a643-af8f4e1dcb2a",
+      "name": "Preparar Menú Satélite"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: '⚠️ No pudimos obtener la imagen satelital en este momento. Por favor, intenta nuevamente en unos minutos. 🙏'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        2688
+      ],
+      "id": "fc25edc1-5f27-4bfa-a68d-fcef34a88d60",
+      "name": "Preparar Mensaje Error Satélite"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\nconst linkPlanes = $('Configuración Global').first().json.planes_url;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: `⭐ *Planes IAGRO*\\n\\n🆓 *Gratis* — $0\\n• Pronóstico y radar\\n• Consulta de alertas\\n• Registro de lluvias\\n• Imagen satelital de tu parcela\\n\\n🌱 *Pro Agricultor* — $4.99/mes\\n• Todo lo gratis\\n• 🔔 Alertas automáticas por WhatsApp\\n• 📰 Resumen diario 6:00 a. m.\\n• 🛰️ NDVI: salud del cultivo por satélite\\n• 💧 Recomendación de riego semanal\\n\\n🏢 *Agro Empresa* — $19.99/mes\\n• Todo Pro, hasta 20 lotes\\n• 5 usuarios (técnicos / encargados)\\n• Reporte mensual para bancos y seguros\\n\\n👉 Suscríbete aquí: ${linkPlanes}`\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        1696
+      ],
+      "id": "63242d40-e54a-4e28-81a1-a5e705059d68",
+      "name": "Preparar Mensaje Planes"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst conversationId = $('Webhook').item.json.body.conversation.id;\nconst error = $json.lluvia_error ? `⚠️ ${$json.lluvia_error}\\n\\n` : '';\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: `${error}🌧️ *Registro de lluvia*\\n\\nEscríbeme cuánto marcó tu pluviómetro, por ejemplo:\\n\\n• _llovió 15 mm_\\n• _llovió 8,5 mm ayer_\\n• _cayeron 20 mm en el lote norte_\\n• _lluvia 12 mm 05/10_\\n\\nYo llevo tu cuaderno de campo y te muestro los acumulados del mes y del año 📒`\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        1856
+      ],
+      "id": "95e102cf-bccc-4c45-88ca-2d84c4364e50",
+      "name": "Preparar Ayuda Registro Lluvia"
+    },
+    {
+      "parameters": {
+        "content": "## 6. Servicios IA Clima (requieren registro)\nUn solo IF de registro para todos los servicios nuevos → **Enrutar Servicios**:\n- 🌧️ **Registrar lluvia**: \"llovió 15 mm ayer en el lote norte\" → tabla `rain_records`\n- 📊 **Historial**: acumulados mes/año/30 días + barras de 6 meses\n- 🌬️ **Viento por horas**: API IAGRO (`/forecast/hourly`)\n- 🚨 **Alertas / 💨 Fumigar / 💧 Riego**: Open-Meteo (gratis, sin API key)\n- 🛰️ **Satélite**: parcela (Esri), nubes (NASA MODIS) y NDVI real (NASA MODIS 8 días), enviadas como imagen a Chatwoot\n\n⚠️ Antes de activar: ejecutar `iagro-rain_records.sql` en Postgres.",
+        "height": 300,
+        "width": 760,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        1584
+      ],
+      "id": "8698d668-004d-4af3-9cec-bdb320690a76",
+      "name": "Nota - s7"
+    },
+    {
+      "parameters": {
+        "content": "## 7. Planes y ayuda de lluvia\nRespuestas públicas (no requieren registro). Cambia el enlace de pago en **Configuración Global → planes_url**.",
+        "width": 360,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        2016
+      ],
+      "id": "c862bdb2-6e8f-4077-80e5-4a9fb33ac36f",
+      "name": "Nota - s8"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Configuración Global').item.json.weather_api_url }}/forecast/hourly?lat={{ $json.usuario.latitude }}&lon={{ $json.usuario.longitude }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2432,
+        2816
+      ],
+      "id": "88f78936-d43e-4108-a5ec-e52c7224bbbc",
+      "name": "Consultar Viento (API IAGRO)",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Viento desde la API IAGRO (/forecast/hourly)\n// Hoy y mañana: detalle por horario + link al radar\n// Campos por horario: h (hora), vsd (km/h), vdId (de dónde viene: N, NE...), vd45 (grados), vg (ráfaga km/h o null)\nconst data = $json.data || [];\nconst ctx = $('Adjuntar Datos de Usuario').first().json;\nconst usuario = ctx.usuario || {};\nconst conversationId = $('Webhook').item.json.body.conversation.id;\nconst finca = usuario.nombre_propiedad || 'tu campo';\n\n// ===== Ajustes =====\nconst DIAS_DETALLE = 2;     // hoy + mañana con cada horario\nconst MAX_BOTONES = 1000;   // WhatsApp rechaza botones si el texto supera 1024\n\nconst r = (v) => Math.round(Number(v) || 0);\nconst num = (v) => (v === null || v === undefined || v === '') ? null : Number(v);\nconst NOMBRES = { N: 'Norte', NE: 'Noreste', E: 'Este', SE: 'Sureste', S: 'Sur', SO: 'Suroeste', O: 'Oeste', NO: 'Noroeste' };\nconst PUNTOS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];\n// La flecha indica HACIA dónde sopla (viento del Norte empuja hacia el Sur → ↓)\nconst FLECHAS = { N: '↓', NE: '↙', E: '←', SE: '↖', S: '↑', SO: '↗', O: '→', NO: '↘' };\nconst norm = (g) => ((Number(g) || 0) % 360 + 360) % 360;\nconst puntoDe = (g) => PUNTOS[Math.round(norm(g) / 45) % 8];\nconst nivel = (v, g) => (v >= 35 || g >= 60) ? '🔴' : (v >= 20 || g >= 45) ? '🟠' : v >= 10 ? '🟡' : '🟢';\n\nconst DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];\nconst etiquetaDia = (fecha, i) => {\n  const [dd, mm, aa] = fecha.split('/');\n  const ddmm = `${dd}/${mm}`;\n  return i === 0 ? `Hoy ${ddmm}` : i === 1 ? `Mañana ${ddmm}` : `${DIAS[new Date(aa, mm - 1, dd, 12).getDay()]} ${ddmm}`;\n};\n\nconst dias = data.slice(0, DIAS_DETALLE).map((dia, i) => ({\n  etiqueta: etiquetaDia(dia.fecha, i),\n  paso: dia.granularidad_horas || 1,\n  filas: (dia.horarios || [])\n    .filter(h => num(h.vsd) !== null)\n    .map(h => ({ h: h.h, v: num(h.vsd), g: num(h.vg), dir: h.vdId || puntoDe(h.vd45), grados: h.vd45 ?? null }))\n})).filter(d => d.filas.length);\n\nif (!dias.length) {\n  return [{ json: { conversation_id: conversationId, content: '⚠️ No hay datos de viento disponibles en este momento. Intenta nuevamente en unos minutos. 🙏' } }];\n}\n\n// ===== Encabezado =====\nconst ahora = dias[0].filas[0];\nconst encabezado = `💨 *Viento — ${finca}*\\n\\n` +\n  `🌬️ *Ahora (${ahora.h}):* ${r(ahora.v)} km/h del ${NOMBRES[ahora.dir] || ahora.dir}` +\n  `${ahora.grados !== null ? ` (${r(ahora.grados)}°)` : ''} ${FLECHAS[ahora.dir] || ''}` +\n  `${ahora.g !== null ? ` · ráfagas ${r(ahora.g)} km/h` : ''}`;\n\n// ===== Detalle (hoy + mañana) =====\nconst detalle = dias.map(d =>\n  `📅 *${d.etiqueta}*${d.paso > 1 ? ` _(cada ${d.paso} h)_` : ''}\\n` +\n  d.filas.map(f => `${f.h} ${nivel(f.v, f.g ?? 0)} ${r(f.v)} km/h del ${f.dir} ${FLECHAS[f.dir] || ''}${f.g !== null ? ` · ráf ${r(f.g)}` : ''}`).join('\\n')\n).join('\\n\\n');\n\nconst leyenda = `🟢 <10 · 🟡 10–20 · 🟠 20–35 · 🔴 >35 km/h\\n_“del S” = de dónde viene · flecha = hacia dónde sopla_`;\nconst botones = {\n  content_type: 'input_select',\n  content_attributes: {\n    items: [\n      { title: '💨 ¿Puedo fumigar?', value: 'fumigar' },\n      { title: '🚨 Alertas', value: 'alertas' },\n      { title: '📋 Ver menú', value: 'menu' }\n    ]\n  }\n};\nconst conBotones = (content) => content.length <= MAX_BOTONES ? { content, ...botones } : { content };\n\nconst radar = `🌐 Radar en vivo: https://iagro360.xyz/radar/${usuario.id}`;\n\n// Detalle 48 h + radar. Si no entra en el límite de WhatsApp para botones, se quita la leyenda\nconst completo = `${encabezado}\\n\\n${detalle}\\n\\n${leyenda}\\n\\n${radar}`;\nconst corto = `${encabezado}\\n\\n${detalle}\\n\\n${radar}`;\nreturn [{ json: { conversation_id: conversationId, ...conBotones(completo.length <= MAX_BOTONES ? completo : corto) } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2672,
+        2800
+      ],
+      "id": "c36707b0-9bb5-4ab9-84a4-7ca959da19f7",
+      "name": "Formatear Viento por Horas"
+    },
+    {
+      "parameters": {
+        "content": "## 8. Campaña FERIA AGRO VIDAS (no requiere registro)\n- **FERIA** → bienvenida + clima de los 2 días (API /hourly) + pide ubicación\n- 📍 **Ubicación** o 📋 **zona** → clima del lote (API /next24h) + promo con 3 botones\n- 🧭 Guía (⭐ Stand iAgro + sectores) · 🌤️ Clima feria · 👥 Invitar amigo\n- Empresas por sector: **feria_sectores** → `stands: [{\"nombre\":\"Empresa\",\"stand\":\"A-12\"}]`\nDatos editables en **Configuración Global → feria_***. No guarda nada en la BD.",
+        "height": 200,
+        "width": 560,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        2880
+      ],
+      "id": "24550524-bc3e-45a4-8e59-f09b87584d6c",
+      "name": "Nota - s9"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-feria-clima",
+              "leftValue": "={{ !!$json.clima_endpoint }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1872,
+        3136
+      ],
+      "id": "6db7890b-41cc-4f22-b47b-ac2e5f4dace9",
+      "name": "¿Feria Necesita Clima?1"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Configuración Global').first().json.weather_api_url }}/forecast/{{ $json.clima_endpoint }}?lat={{ $json.clima_lat }}&lon={{ $json.clima_lon }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2112,
+        3056
+      ],
+      "id": "9c776f84-b556-40c3-aad4-d53f075d7ee3",
+      "name": "Consultar Clima Feria (API)1",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mensajes de la campaña FERIA (nombre en Configuración Global → feria_nombre)\n// Llega desde \"Consultar Clima Feria (API)\" (con $json.data) o directo desde el IF (sin clima)\nconst ctx = $('Adjuntar Datos de Usuario').first().json;\nconst cfg = $('Configuración Global').first().json;\nconst conversationId = $('Webhook').first().json.body.conversation.id;\nconst intent = ctx.intent;\nconst data = $json.data || [];\nconst registrado = !!ctx.usuario?.id;\nconst feria = cfg.feria_nombre || 'Agro Vidas';\n\nconst nombre = String(ctx.contact_name || '').split(' ')[0] || 'productor';\nconst codigo = `AV${String(ctx.telefono || '').slice(-6)}`;\nconst r = (v) => Math.round(Number(v) || 0);\nconst n = (v) => Number(v) || 0;\nconst fmtMm = (mm) => mm <= 0 ? '0' : mm >= 1 ? String(Math.round(mm)) : (Math.round(mm * 10) / 10).toFixed(1);\nconst radarUrl = (lat, lon) => `https://www.ventusky.com/?p=${Number(lat).toFixed(3)};${Number(lon).toFixed(3)};9&l=rain-3h`;\nconst mapsUrl = (lat, lon) => `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;\nconst DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];\nconst diaSemana = (f) => { const [d, m, a] = f.split('/'); return DIAS[new Date(a, m - 1, d, 12).getDay()]; };\nconst json = (txt, def) => { try { return JSON.parse(txt || ''); } catch (e) { return def; } };\n\nconst msg = (content, items) => ({\n  json: {\n    conversation_id: conversationId,\n    content,\n    ...(items ? { content_type: 'input_select', content_attributes: { items } } : {})\n  }\n});\n\n// WhatsApp: máximo 3 botones y 20 caracteres por título\nconst BOTONES_FERIA = [\n  { title: '🧭 Guía de la feria', value: 'guia' },\n  { title: '🌤️ Clima feria', value: 'clima feria' },\n  { title: '👥 Invitar amigo', value: 'invitar' }\n];\nconst otrosBotones = (excluir) => BOTONES_FERIA.filter(b => b.value !== excluir);\n\n// ---------- Próximas 24 h (/forecast/next24h) ----------\nconst resumen24h = () => {\n  const tds = data.map(h => n(h.temperatura_c));\n  return {\n    ahora: data[0] || {},\n    proxima: data[1] || data[0] || {},\n    mm: data.reduce((s, h) => s + n(h.precipitacion_mm), 0),\n    prob: Math.max(0, ...data.map(h => n(h.probabilidad_precipitacion))),\n    tmin: Math.min(...tds), tmax: Math.max(...tds)\n  };\n};\nconst vientoTxt = (h) => `${r(h.velocidad_viento_kmh)} km/h ${h.direccion_viento || ''}${h.rafaga_kmh != null ? ` (ráf. ${r(h.rafaga_kmh)})` : ''}`;\n\n// =====================================================\n// 1) FERIA: bienvenida + clima de los 2 días + pedir ubicación\n// =====================================================\nif (intent === 'feria') {\n  const hoy = data[0]?.fecha;\n  const finGratis = (hoy ? DateTime.fromFormat(hoy, 'dd/MM/yyyy') : $now).plus({ months: 1 }).toFormat('dd/LL');\n\n  const statsDia = (dia) => {\n    const hs = dia.horarios || [];\n    const diurnas = hs.filter(h => { const x = Number(String(h.h).slice(0, 2)); return x >= 8 && x <= 20; });\n    const base = diurnas.length ? diurnas : hs;\n    const tds = hs.map(h => n(h.td));\n    const frec = {};\n    base.forEach(h => { if (h.vdId) frec[h.vdId] = (frec[h.vdId] || 0) + 1; });\n    return {\n      tmin: Math.min(...tds), tmax: Math.max(...tds),\n      prob: Math.max(0, ...hs.map(h => n(h.rp))),\n      mm: hs.reduce((s, h) => s + n(h.sr), 0),\n      viento: r(base.reduce((s, h) => s + n(h.vsd), 0) / (base.length || 1)),\n      rafaga: Math.max(0, ...base.map(h => n(h.vg))),\n      dir: Object.entries(frec).sort((a, b) => b[1] - a[1])[0]?.[0] || '',\n      lluviaDesde: base.find(h => n(h.rp) >= 50)?.h\n    };\n  };\n\n  const consejo = (s) => {\n    if (s.lluviaDesde) return `☔ lluvia desde ${s.lluviaDesde}`;\n    if (s.mm >= 2 || s.prob >= 40) return '🌦️ llevá paraguas';\n    if (s.rafaga >= 45 || s.viento >= 25) return '💨 ventoso';\n    if (s.tmax >= 33) return '🥵 calor, llevá agua';\n    if (s.tmin <= 12) return '🧥 llevá abrigo';\n    return '☀️ ideal para recorrer';\n  };\n\n  const lineas = [cfg.feria_dia1, cfg.feria_dia2].map(fecha => {\n    const dia = data.find(d => d.fecha === fecha);\n    if (!dia || !(dia.horarios || []).length) return null;\n    const s = statsDia(dia);\n    return `*${fecha === hoy ? 'Hoy' : diaSemana(fecha)} ${fecha.slice(0, 2)}:* ${r(s.tmin)}–${r(s.tmax)}° · 🌧️${r(s.prob)}% · 💨${s.viento} ${s.dir}\\n${consejo(s)}`;\n  }).filter(Boolean);\n\n  return [\n    msg(\n      `🌱 ¡Hola *${nombre}*! Bienvenido a iAgro en *${feria} 2026* 🎪\\n` +\n      `🎁 Tu mes gratis está activo hasta el *${finGratis}*\\n\\n` +\n      (lineas.length ? `🌤️ *Clima en la feria*\\n${lineas.join('\\n')}\\n\\n` : '') +\n      `📡 Radar: ${radarUrl(cfg.feria_lat, cfg.feria_lon)}`\n    ),\n    msg(\n      `📍 *Enviame la ubicación de tu lote* y te doy su pronóstico exacto.\\n` +\n      `👉 Tocá 📎 → Ubicación → mové el pin a tu campo.`,\n      [\n        { title: '📋 Elegir mi zona', value: 'elegir mi zona' },\n        { title: '🧭 Guía de la feria', value: 'guia' }\n      ]\n    )\n  ];\n}\n\n// =====================================================\n// 2) LISTA DE ZONAS (respaldo si no sabe enviar la ubicación)\n// =====================================================\nif (intent === 'feria_zonas') {\n  return [msg(\n    '📋 Elegí la zona de tu lote:',\n    json(cfg.feria_zonas, []).slice(0, 10).map(z => ({ title: z.nombre, value: z.nombre }))\n  )];\n}\n\n// =====================================================\n// 3) CONFIRMACIÓN DEL LOTE (ubicación o zona) + promo\n// =====================================================\nif (intent === 'ubicacion' || intent === 'feria_zona') {\n  const u = ctx.ubicacion || {};\n  let lugar;\n  if (intent === 'feria_zona') {\n    lugar = `en *${u.nombre}*`;\n  } else {\n    // Localidad más cercana de la lista de zonas (sin API externa)\n    const km = (a, b) => {\n      const rad = Math.PI / 180, dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;\n      const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;\n      return 12742 * Math.asin(Math.sqrt(x));\n    };\n    const cerca = json(cfg.feria_zonas, [])\n      .map(z => ({ ...z, d: km(u, { lat: Number(z.lat), lon: Number(z.lon) }) }))\n      .sort((a, b) => a.d - b.d)[0];\n    lugar = cerca && cerca.d <= 40 ? `cerca de *${cerca.nombre}*` : `en *${Number(u.lat).toFixed(3)}, ${Number(u.lon).toFixed(3)}*`;\n  }\n\n  const s = resumen24h();\n  const clima = data.length\n    ? `🌡️ ${r(s.ahora.temperatura_c)}° ${s.ahora.condicion || ''} · ${r(s.tmin)}–${r(s.tmax)}° en 24 h\\n` +\n      `🌧️ ${fmtMm(s.mm)} mm (${r(s.prob)}%) · 💨 ${vientoTxt(s.ahora)}`\n    : '⚠️ No pude obtener el clima de tu campo ahora.';\n\n  const salida = [msg(\n    `✅ Lote recibido ${lugar}\\n${clima}\\n📡 Radar: ${radarUrl(u.lat, u.lon)}\\n\\n` +\n    `¿Otro lote? Enviame otra ubicación.`\n  )];\n\n  if (!registrado) {\n    salida.push(msg(\n      `🎁 *Promo ${feria}*\\n` +\n      `✅ 1 mes gratis · luego ${cfg.feria_precio}/mes\\n` +\n      `✅ Alertas de surazo, tormenta y viento\\n` +\n      `👥 3 amigos con tu código *${codigo}* = 1 mes más gratis`,\n      BOTONES_FERIA\n    ));\n  }\n  return salida;\n}\n\n// =====================================================\n// 4) GUÍA DE LA FERIA: stand iAgro + sectores\n// =====================================================\nconst sectores = json(cfg.feria_sectores, []);\n\nif (intent === 'feria_guia') {\n  return [msg(\n    `🧭 *Guía ${feria}*\\nElegí qué querés visitar 👇`,\n    [\n      { title: '⭐ Stand iAgro', value: 'stand' },\n      ...sectores.slice(0, 9).map(s => ({ title: `${s.emoji} ${s.nombre}`, value: s.nombre }))\n    ]\n  )];\n}\n\nif (intent === 'feria_sector') {\n  const sec = sectores.find(s => s.nombre === ctx.feria_sector) || {};\n  const stands = sec.stands || [];\n  const lista = stands.length\n    ? stands.slice(0, 12).map(e => `• *${e.nombre}* — ${e.stand}`).join('\\n')\n    : `Estamos cargando los stands de este sector.\\nPasá por el *Stand iAgro* (${cfg.feria_stand}) y te orientamos 😉`;\n  return [msg(`${sec.emoji || '🧭'} *${sec.nombre || 'Sector'}*\\n${lista}`, BOTONES_FERIA)];\n}\n\nif (intent === 'feria_stand') {\n  return [msg(\n    `⭐ *Stand iAgro — ${cfg.feria_stand}*\\n` +\n    `Conocé el pronóstico de tu lote y participá del sorteo de *${cfg.feria_premio}* 🎁\\n` +\n    `🗺️ ${mapsUrl(cfg.feria_stand_lat, cfg.feria_stand_lon)}`,\n    BOTONES_FERIA\n  )];\n}\n\n// =====================================================\n// 5) CLIMA AHORA EN LA FERIA / INVITAR\n// =====================================================\nif (intent === 'feria_clima') {\n  if (!data.length) return [msg('⚠️ No pude obtener el clima de la feria ahora. Probá en unos minutos 🙏')];\n  const s = resumen24h();\n  return [msg(\n    `🌡️ *Ahora en la feria:* ${r(s.ahora.temperatura_c)}° ${s.ahora.condicion || ''}\\n` +\n    `🌧️ Lluvia próxima hora: ${r(s.proxima.probabilidad_precipitacion)}% · 💨 ${vientoTxt(s.ahora)}\\n` +\n    `📡 Radar: ${radarUrl(cfg.feria_lat, cfg.feria_lon)}`,\n    otrosBotones('clima feria')\n  )];\n}\n\nif (intent === 'feria_invitar') {\n  // Dos mensajes: la instrucción y el texto limpio, listo para reenviar\n  return [\n    msg('👥 Reenviá este mensaje a tus amigos productores 👇'),\n    msg(`Yo recibo el pronóstico de mi lote gratis en WhatsApp con iAgro 🌱 Escribí aquí 👉 ${cfg.feria_wa_link} y poné el código ${codigo}`)\n  ];\n}\n\nreturn [msg('🤔 No entendí tu mensaje. Escribí *Menú* para ver las opciones.')];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2352,
+        3136
+      ],
+      "id": "e46f09fe-d640-40e1-8c5b-d2dcc5639754",
+      "name": "Preparar Mensajes Feria1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Mensajes Entrantes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Mensajes Entrantes": {
+      "main": [
+        [
+          {
+            "node": "Configuración Global",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración Global": {
+      "main": [
+        [
+          {
+            "node": "Parsear Mensaje y Detectar Intención",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear Mensaje y Detectar Intención": {
+      "main": [
+        [
+          {
+            "node": "Buscar Usuario por Teléfono",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Usuario por Teléfono": {
+      "main": [
+        [
+          {
+            "node": "Adjuntar Datos de Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adjuntar Datos de Usuario": {
+      "main": [
+        [
+          {
+            "node": "Enrutar por Intención",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrutar por Intención": {
+      "main": [
+        [
+          {
+            "node": "Preparar Menú Saludo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Usuario Registrado?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje Despedida",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar Código Temporal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Menú Ayuda",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Usuario Registrado?1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Usuario Registrado? (Servicios)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje Planes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Ayuda Registro Lluvia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Feria Necesita Clima?1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje No Entendido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Usuario Registrado?": {
+      "main": [
+        [
+          {
+            "node": "Consultar API Clima",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje No Registrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar API Clima": {
+      "main": [
+        [
+          {
+            "node": "Formatear Pronóstico + Radar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje Error Clima",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Código Temporal": {
+      "main": [
+        [
+          {
+            "node": "¿Código Válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Código Válido?": {
+      "main": [
+        [
+          {
+            "node": "Adjuntar Teléfono al Registro",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje Código Inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adjuntar Teléfono al Registro": {
+      "main": [
+        [
+          {
+            "node": "¿Teléfono Ya Registrado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Teléfono Ya Registrado?": {
+      "main": [
+        [
+          {
+            "node": "Insertar Nuevo Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje Ya Registrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar Nuevo Usuario": {
+      "main": [
+        [
+          {
+            "node": "Preparar Mensaje Registro Exitoso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Menú Saludo": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Menú Ayuda": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensaje Despedida": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensaje No Entendido": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensaje No Registrado": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Pronóstico + Radar": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensaje Error Clima": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensaje Código Inválido": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensaje Ya Registrado": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensaje Registro Exitoso": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Payload Saliente": {
+      "main": [
+        [
+          {
+            "node": "Enviar Mensaje Chatwoot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Usuario Registrado?1": {
+      "main": [
+        [
+          {
+            "node": "Preparar Mensaje Radar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje No Registrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensaje Radar": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Usuario Registrado? (Servicios)": {
+      "main": [
+        [
+          {
+            "node": "Enrutar Servicios",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje No Registrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrutar Servicios": {
+      "main": [
+        [
+          {
+            "node": "Guardar Lluvia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consultar Historial Lluvias",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consultar Clima Agro (Open-Meteo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Imagen Satelital",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consultar Viento (API IAGRO)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar Lluvia": {
+      "main": [
+        [
+          {
+            "node": "Formatear Registro Lluvia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje Error BD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Historial Lluvias": {
+      "main": [
+        [
+          {
+            "node": "Formatear Historial Lluvias",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje Error BD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Clima Agro (Open-Meteo)": {
+      "main": [
+        [
+          {
+            "node": "Analizar Clima Agro",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje Error Clima",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Imagen Satelital": {
+      "main": [
+        [
+          {
+            "node": "Descargar Imagen Satelital",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar Imagen Satelital": {
+      "main": [
+        [
+          {
+            "node": "Nombrar Archivo Imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje Error Satélite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nombrar Archivo Imagen": {
+      "main": [
+        [
+          {
+            "node": "Enviar Imagen Chatwoot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Imagen Chatwoot": {
+      "main": [
+        [
+          {
+            "node": "Preparar Menú Satélite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Registro Lluvia": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Historial Lluvias": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensaje Error BD": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analizar Clima Agro": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Menú Satélite": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensaje Error Satélite": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensaje Planes": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Ayuda Registro Lluvia": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Viento (API IAGRO)": {
+      "main": [
+        [
+          {
+            "node": "Formatear Viento por Horas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje Error Clima",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Viento por Horas": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Feria Necesita Clima?1": {
+      "main": [
+        [
+          {
+            "node": "Consultar Clima Feria (API)1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensajes Feria1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Clima Feria (API)1": {
+      "main": [
+        [
+          {
+            "node": "Preparar Mensajes Feria1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Mensaje Error Clima",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Mensajes Feria1": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "e2439ea7-c0d2-4675-b4e7-e4e97980c9e1",
+  "meta": {
+    "instanceId": "57ca2d17e06c938c45a8e1723b76ac450730448c2b371a42fbaabb0215ce5022"
+  },
+  "id": "lLfDOe6NoLdeHUy4",
+  "tags": []
+}

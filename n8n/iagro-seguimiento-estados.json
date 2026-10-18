@@ -1,0 +1,371 @@
+{
+  "name": "IAGRO · Seguimiento de estados",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "iagro-chatwoot-2f3eed71e6334227",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "name": "Webhook Chatwoot",
+      "webhookId": "8f5d2f1c-fceb-46fe-9150-c09226fb63f8",
+      "id": "785ef383-0427-4594-a587-377757063abf"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Webhook de Chatwoot: solo interesan los mensajes ENTRANTES (respuestas de los usuarios)\nconst b = $json.body || {};\nif (b.event !== 'message_created' || b.message_type !== 'incoming' || b.private) return [];\n\nconst sender = b.sender || b.conversation?.meta?.sender || {};\nconst telefono = String(sender.phone_number || '').replace(/\\D/g, '');\nif (!telefono) return [];\n\n// created_at puede venir como fecha ISO o como segundos UNIX\nlet fecha = b.created_at;\nif (typeof fecha === 'number' || /^\\d+$/.test(String(fecha))) fecha = new Date(Number(fecha) * 1000).toISOString();\nif (!fecha || isNaN(new Date(fecha))) fecha = new Date().toISOString();\n\n// Los botones de la plantilla llegan como texto (\"Dejar de recibir\") con in_reply_to = id del mensaje de la alerta\nconst inReplyTo = b.content_attributes?.in_reply_to;\nreturn [{ json: {\n  telefono, fecha, contact_id: sender.id ? String(sender.id) : '',\n  contenido: String(b.content || '').slice(0, 500),\n  in_reply_to: inReplyTo ? String(inReplyTo) : '',\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        100
+      ],
+      "name": "Solo mensajes entrantes",
+      "id": "edb4efb6-9876-405a-aa0e-467be64e8276"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.registrar_respuesta($1, $2::timestamptz, NULLIF($4, ''), NULLIF($5, '')::bigint) AS r,\n       bot_clima.vincular_contacto((SELECT id FROM bot_clima.usuarios WHERE telefono = $1), NULLIF($3, '')::bigint)",
+        "options": {
+          "queryReplacement": "={{ [$json.telefono, $json.fecha, $json.contact_id, $json.contenido, $json.in_reply_to] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        400,
+        100
+      ],
+      "name": "Registrar respuesta",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "514406ac-8acf-4d6b-8f69-81e6c005b914"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "name": "Cada 10 minutos",
+      "id": "fc8bf822-3b30-4359-a31d-78ba3f0b2851"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM bot_clima.mensajes_por_actualizar()",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        200,
+        400
+      ],
+      "name": "Mensajes pendientes",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "id": "85edb13a-04ec-436c-a178-1552a5dbe95e"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.config_json() AS cfg",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        400,
+        400
+      ],
+      "name": "Configuración",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "executeOnce": true,
+      "id": "5e8f48c1-c6f9-4a52-9cf9-e47e2028562c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Una consulta a Chatwoot por conversación con mensajes pendientes de confirmar\nconst cfg = $('Configuración').first().json.cfg;\nconst base = `${String(cfg.chatwoot_url_publica || '').replace(/\\/+$/, '')}/api/v1/accounts/${cfg.chatwoot_account_id}`;\nreturn $('Mensajes pendientes').all()\n  .filter((i) => i.json.conversation_id)\n  .map((i) => ({\n    json: {\n      conversation_id: i.json.conversation_id,\n      message_ids: (i.json.message_ids || []).map(Number),\n      url: `${base}/conversations/${i.json.conversation_id}/messages`,\n    },\n  }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        400
+      ],
+      "name": "Armar consultas",
+      "id": "61c67d64-4336-46ba-a3c3-d5d2f7d68339"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        400
+      ],
+      "name": "Mensajes de la conversación",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "8c45fd99-e01d-4754-9def-1e4e4e61b509"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrae el estado actual (delivered / read / failed) de los mensajes que seguimos\nconst pedidos = $('Armar consultas').all();\nconst salida = [];\n$input.all().forEach((item, i) => {\n  const ids = new Set(pedidos[i]?.json.message_ids || []);\n  for (const m of item.json.payload || []) {\n    if (!ids.has(Number(m.id))) continue;\n    const estado = String(m.status || '');\n    if (!['delivered', 'read', 'failed'].includes(estado)) continue;\n    const err = m.content_attributes?.external_error || '';\n    salida.push({ json: { message_id: String(m.id), estado, error: String(err).slice(0, 300) } });\n  }\n});\nreturn salida;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        400
+      ],
+      "name": "Estados",
+      "id": "34bb19df-358c-4fd9-b659-e14a2d1a5d61"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.actualizar_estado_mensaje($1::bigint, $2, NULLIF($3, ''))",
+        "options": {
+          "queryReplacement": "={{ [$json.message_id, $json.estado, $json.error] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1200,
+        400
+      ],
+      "name": "Actualizar estado",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "eebd4865-7f1e-4cd3-913e-d565d7956dda"
+    },
+    {
+      "parameters": {
+        "content": "## 👀 IAGRO · Seguimiento de estados\n**Arriba — respuestas:** Chatwoot avisa cada mensaje entrante → se marca *respondió* en la alerta (la del botón tocado) o difusión de los últimos días.\nBotón **Dejar de recibir** → se desactivan sus alertas y se le confirma. **Activar alertas** → se reactivan.\n⚠️ En **Confirmar al usuario** elige el flujo *IAGRO · Enviar WhatsApp*.\n👉 Chatwoot → Configuración → Integraciones → Webhooks → *Agregar* → pega la **Production URL** de este webhook y marca **Mensaje creado**.\n\n**Abajo — entregado/leído:** cada 10 min consulta a Chatwoot el estado de los mensajes enviados en los últimos 3 días (✓✓ entregado, ✓✓ azul leído, ✗ falló).",
+        "width": 760,
+        "height": 380,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "name": "Nota",
+      "id": "50945fd6-d0e5-4233-902d-5c42483e7fe7"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Si el usuario tocó \"Dejar de recibir\" o escribió \"Activar alertas\", se le confirma\nconst TEXTOS = {\n  desactivado: '✅ Listo, ya no te enviaremos alertas de lluvia.\\n\\nSi quieres volver a recibirlas, escribe *Activar alertas*.',\n  reactivado: '🌧️ ¡Listo! Volverás a recibir las alertas de lluvia de IAGRO.',\n};\nconst entradas = $('Solo mensajes entrantes').all();\nreturn $input.all().flatMap((item, i) => {\n  const r = item.json.r || {};\n  const e = entradas[i]?.json;\n  if (!r.accion || !TEXTOS[r.accion] || !e) return [];\n  return [{ json: {\n    usuario_id: r.usuario_id, telefono: e.telefono, nombre: '',\n    chatwoot_contact_id: e.contact_id || null,\n    contenido: TEXTOS[r.accion], usar_plantilla: false,  // acaba de escribir: ventana de 24 h abierta\n  } }];\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        620,
+        100
+      ],
+      "name": "Confirmación de alertas",
+      "id": "f011c720-5426-46f2-b0fb-80603b02e9e9"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "IAGRO · Enviar WhatsApp"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        840,
+        100
+      ],
+      "name": "Confirmar al usuario",
+      "id": "264c5be0-199c-45fd-bb7a-93f0fd8d3421"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Chatwoot": {
+      "main": [
+        [
+          {
+            "node": "Solo mensajes entrantes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solo mensajes entrantes": {
+      "main": [
+        [
+          {
+            "node": "Registrar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cada 10 minutos": {
+      "main": [
+        [
+          {
+            "node": "Mensajes pendientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensajes pendientes": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Armar consultas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar consultas": {
+      "main": [
+        [
+          {
+            "node": "Mensajes de la conversación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensajes de la conversación": {
+      "main": [
+        [
+          {
+            "node": "Estados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estados": {
+      "main": [
+        [
+          {
+            "node": "Actualizar estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar respuesta": {
+      "main": [
+        [
+          {
+            "node": "Confirmación de alertas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmación de alertas": {
+      "main": [
+        [
+          {
+            "node": "Confirmar al usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/La_Paz",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "meta": {
+    "instanceId": "57ca2d17e06c938c45a8e1723b76ac450730448c2b371a42fbaabb0215ce5022"
+  },
+  "tags": []
+}

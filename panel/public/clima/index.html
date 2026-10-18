@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AgroClima IA</title>
+  <meta name="description" content="Agente de IA experto en clima para agricultores, directamente en WhatsApp: pronósticos, alertas, registro de lluvias e imágenes satelitales.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/clima/styles.css">
+</head>
+<body>
+  <main class="layout">
+
+    <!-- ============ PANEL DE VENTA (LANDING) ============ -->
+    <section class="landing" aria-label="Información del producto">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#25D366"/><circle cx="19" cy="19" r="7" fill="#FFD54F"/><path d="M14 33a7 7 0 0 1 1.5-13.8A9 9 0 0 1 33 21a6 6 0 0 1 1 12z" fill="#fff"/><path d="M22 37c0-4 3-7 7-8-1 4-3 7-7 8z" fill="#2e7d32"/></svg>
+        </div>
+        <span>AgroClima <b>IA</b></span>
+      </div>
+
+      <h1>Tu agrónomo del clima,<br><span class="hl">directo en WhatsApp</span></h1>
+      <p class="lead">Un agente de inteligencia artificial que vigila el clima de tu campo las 24 horas: pronósticos precisos, alertas antes de la helada, registro de lluvias e imágenes satelitales de tu parcela. Sin instalar nada.</p>
+
+      <ul class="features">
+        <li><span class="fi">🌦️</span><div><b>Pronóstico hiperlocal</b><small>Hora por hora y 7 días para las coordenadas exactas de tu campo.</small></div></li>
+        <li><span class="fi">🚨</span><div><b>Alertas automáticas</b><small>Helada, lluvia intensa, viento, calor y tormentas antes de que ocurran.</small></div></li>
+        <li><span class="fi">🌧️</span><div><b>Pluviómetro digital</b><small>Guarda cuánto llovió por lote, compáralo con el modelo y exporta a Excel.</small></div></li>
+        <li><span class="fi">🛰️</span><div><b>Imágenes satelitales</b><small>Vista de tu parcela, nubosidad diaria e índice de vegetación (NDVI).</small></div></li>
+        <li><span class="fi">🧑‍🌾</span><div><b>Consejos agronómicos</b><small>Ventanas de fumigación, riego según evapotranspiración y riesgo de hongos.</small></div></li>
+      </ul>
+
+      <div class="pricing">
+        <div class="price-card">
+          <span class="pc-name">Gratis</span>
+          <span class="pc-price">$0</span>
+          <small>Clima actual · 3 días · 30 registros de lluvia</small>
+        </div>
+        <div class="price-card featured">
+          <span class="pc-tag">Más elegido</span>
+          <span class="pc-name">Pro Agricultor</span>
+          <span class="pc-price">$4.99<small>/mes</small></span>
+          <small>7 días · alertas automáticas · NDVI · exportar</small>
+        </div>
+        <div class="price-card">
+          <span class="pc-name">Agro Empresa</span>
+          <span class="pc-price">$19.99<small>/mes</small></span>
+          <small>Hasta 20 lotes · multiusuario · reportes</small>
+        </div>
+      </div>
+
+      <div class="landing-actions">
+        <button class="btn-primary" id="btnFocusChat" type="button">💬 Probar el bot ahora</button>
+        <button class="btn-ghost" id="btnResetDemo" type="button">↺ Reiniciar demo</button>
+      </div>
+      <p class="disclaimer">Demo interactiva. Datos del clima: Open-Meteo · Imágenes: Esri World Imagery y NASA GIBS. El NDVI y los pagos son simulados.</p>
+    </section>
+
+    <!-- ============ TELÉFONO / WHATSAPP ============ -->
+    <section class="phone-wrap" aria-label="Simulación de WhatsApp">
+      <div class="phone" id="phone">
+        <div class="phone-notch" aria-hidden="true"></div>
+
+        <!-- Barra de estado -->
+        <div class="statusbar" aria-hidden="true">
+          <span id="sbTime">9:41</span>
+          <span class="sb-icons">
+            <svg viewBox="0 0 18 12"><path d="M1 11h2V8H1zm4 0h2V6H5zm4 0h2V3H9zm4 0h2V0h-2z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 12"><path d="M8 2.5c2.3 0 4.4.9 6 2.4l1.3-1.4A10.6 10.6 0 0 0 8 .5 10.6 10.6 0 0 0 .7 3.5L2 4.9a8.6 8.6 0 0 1 6-2.4zm0 4c1.2 0 2.3.5 3.2 1.2l1.3-1.4A6.6 6.6 0 0 0 8 4.5c-1.7 0-3.3.7-4.5 1.8l1.3 1.4C5.7 7 6.8 6.5 8 6.5zM8 12l2-2.2a2.9 2.9 0 0 0-4 0z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor"/><rect x="2" y="2" width="16" height="8" rx="1.5" fill="currentColor"/><rect x="23.5" y="4" width="1.8" height="4" rx=".9" fill="currentColor"/></svg>
+          </span>
+        </div>
+
+        <!-- Notificación push -->
+        <div class="push" id="push" role="status" aria-live="polite">
+          <div class="push-icon">
+            <svg viewBox="0 0 32 32"><path fill="#fff" d="M16 3a13 13 0 0 0-11.2 19.6L3 29l6.6-1.7A13 13 0 1 0 16 3z"/><path fill="#25D366" d="M16 5a11 11 0 0 0-9.4 16.7l.3.4-1.1 4 4.1-1.1.4.2A11 11 0 1 0 16 5z"/></svg>
+          </div>
+          <div class="push-body">
+            <div class="push-top"><b>WhatsApp</b><span>ahora</span></div>
+            <div class="push-title" id="pushTitle">AgroClima IA</div>
+            <div class="push-text" id="pushText"></div>
+          </div>
+        </div>
+
+        <!-- Cabecera del chat -->
+        <header class="chat-header">
+          <button class="icon-btn back" type="button" aria-label="Volver">
+            <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" fill="currentColor"/></svg>
+          </button>
+          <div class="avatar" aria-hidden="true">
+            <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#e8f5e9"/><circle cx="19" cy="19" r="7" fill="#FFC107"/><path d="M14 33a7 7 0 0 1 1.5-13.8A9 9 0 0 1 33 21a6 6 0 0 1 1 12z" fill="#90CAF9"/><path d="M22 37c0-4 3-7 7-8-1 4-3 7-7 8z" fill="#2e7d32"/></svg>
+          </div>
+          <div class="contact">
+            <div class="contact-name">AgroClima IA
+              <svg class="verified" viewBox="0 0 24 24" aria-label="Cuenta verificada"><path fill="#25D366" d="m12 1 2.6 2.1 3.3-.3.9 3.2 2.9 1.6-1 3.2 1 3.2-2.9 1.6-.9 3.2-3.3-.3L12 23l-2.6-2.1-3.3.3-.9-3.2-2.9-1.6 1-3.2-1-3.2 2.9-1.6.9-3.2 3.3.3z"/><path fill="#fff" d="m10.5 15.8-3.3-3.3 1.4-1.4 1.9 1.9 4.9-4.9 1.4 1.4z"/></svg>
+            </div>
+            <div class="contact-status" id="contactStatus">cuenta de empresa</div>
+          </div>
+          <button class="icon-btn" type="button" aria-label="Videollamada" tabindex="-1">
+            <svg viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11z" fill="currentColor"/></svg>
+          </button>
+          <button class="icon-btn" type="button" aria-label="Llamar" tabindex="-1">
+            <svg viewBox="0 0 24 24"><path d="M20 15.5c-1.2 0-2.4-.2-3.6-.6a1 1 0 0 0-1 .2l-2.2 2.2a15 15 0 0 1-6.6-6.6l2.2-2.2a1 1 0 0 0 .3-1A11.4 11.4 0 0 1 8.5 4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1 17 17 0 0 0 17 17 1 1 0 0 0 1-1v-3.5a1 1 0 0 0-1-1z" fill="currentColor"/></svg>
+          </button>
+          <div class="menu-wrap">
+            <button class="icon-btn" id="btnMenu" type="button" aria-label="Más opciones" aria-haspopup="true" aria-expanded="false">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/></svg>
+            </button>
+            <div class="dropdown" id="dropdown" role="menu">
+              <button type="button" role="menuitem" data-action="profile">👤 Mi perfil</button>
+              <button type="button" role="menuitem" data-action="rain_history">🌧️ Mis lluvias</button>
+              <button type="button" role="menuitem" data-action="export_csv">📤 Exportar lluvias (CSV)</button>
+              <button type="button" role="menuitem" data-action="simulate_alert">🔔 Simular alerta push</button>
+              <button type="button" role="menuitem" data-action="toggle_theme">🌓 Cambiar tema</button>
+              <button type="button" role="menuitem" data-action="reset" class="danger">🗑️ Borrar mis datos</button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Mensajes -->
+        <div class="chat" id="chat" aria-live="polite">
+          <div class="day-chip">HOY</div>
+          <div class="e2e-chip">🔒 Los mensajes con esta cuenta de empresa son atendidos por un agente de IA. Tus datos de lluvia se guardan en este dispositivo.</div>
+        </div>
+
+        <button class="scroll-down" id="scrollDown" type="button" aria-label="Ir al último mensaje">
+          <svg viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
+          <span class="badge" id="unreadBadge" hidden>1</span>
+        </button>
+
+        <!-- Barra de escritura -->
+        <form class="composer" id="composer" autocomplete="off">
+          <div class="input-pill">
+            <button class="icon-btn small" type="button" id="btnEmoji" aria-label="Sugerencias rápidas">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.2" stroke="currentColor" stroke-width="1.6" fill="none"/><circle cx="9" cy="10" r="1.2" fill="currentColor"/><circle cx="15" cy="10" r="1.2" fill="currentColor"/><path d="M8 14a4.6 4.6 0 0 0 8 0" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+            </button>
+            <input id="msgInput" type="text" placeholder="Mensaje" aria-label="Escribe un mensaje" maxlength="400">
+            <button class="icon-btn small" type="button" id="btnAttach" aria-label="Adjuntar">
+              <svg viewBox="0 0 24 24"><path d="M16.5 6.5 8.6 14.4a1.8 1.8 0 0 0 2.6 2.6l7.9-7.9a3.6 3.6 0 0 0-5.1-5.1l-8 8a5.4 5.4 0 0 0 7.7 7.7l6.6-6.6" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/></svg>
+            </button>
+            <button class="icon-btn small" type="button" id="btnCamera" aria-label="Ubicación">
+              <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" fill="currentColor"/></svg>
+            </button>
+          </div>
+          <button class="send-btn" id="sendBtn" type="submit" aria-label="Enviar">
+            <svg class="ic-mic" viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5.3-3a5.3 5.3 0 0 1-10.6 0H5a7 7 0 0 0 6 6.9V21h2v-3.1a7 7 0 0 0 6-6.9z" fill="currentColor"/></svg>
+            <svg class="ic-send" viewBox="0 0 24 24"><path d="M2 21 23 12 2 3v7l15 2-15 2z" fill="currentColor"/></svg>
+          </button>
+        </form>
+
+        <!-- Hojas inferiores (bottom sheets) -->
+        <div class="sheet-backdrop" id="sheetBackdrop"></div>
+        <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <button class="icon-btn small" type="button" id="sheetClose" aria-label="Cerrar">
+              <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z" fill="currentColor"/></svg>
+            </button>
+            <h3 id="sheetTitle">Menú</h3>
+          </div>
+          <div class="sheet-body" id="sheetBody"></div>
+        </div>
+
+        <div class="home-indicator" aria-hidden="true"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/clima/app.js"></script>
+</body>
+</html>
