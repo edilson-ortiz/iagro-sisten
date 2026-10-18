@@ -12,3 +12,9 @@ out/
 trd.sql
 *.dump
 *.backup
+
+# Paquetes de despliegue (ahora se despliega con git pull)
+*.tgz
+
+# Builds y cachés locales
+*.tsbuildinfo

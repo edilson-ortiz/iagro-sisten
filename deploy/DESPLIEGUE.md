@@ -53,10 +53,11 @@ Completa `DATABASE_URL` (usuario y contraseña de la credencial Postgres de n8n)
 ## 3. Migraciones (crea el esquema `bot_clima` y copia los usuarios)
 
 ```bash
+sudo docker compose build migrar
 sudo docker compose run --rm migrar
 ```
 
-Debe terminar con `✔ Migraciones aplicadas.` (12 migraciones). Si se vuelve a correr dice `Base de datos al día`.
+Debe terminar con `✔ Migraciones aplicadas.` Si se vuelve a correr dice `Base de datos al día`.
 
 ## 4. Primer despliegue: inbox de WhatsApp y prueba gratis desde hoy
 
@@ -131,12 +132,13 @@ Abre **https://iagro360.xyz** (landing), **https://iagro360.xyz/panel** (entra c
 - Panel → **Consumo** → *Sincronizar con Chatwoot*.
 - Cuando todo funcione: en n8n desactiva los webhooks viejos `registro-clima` y el del radar (`/client`).
 
-## Actualizar más adelante
+## Actualizar más adelante (con git)
+
+En tu PC: haz los cambios, `git commit` y `git push`. En el servidor, un solo comando:
 
 ```bash
-# PC: empaquetar y copiar (paso 1). Servidor:
-cd ~/Iagro/iagro-panel && tar -xzf ~/Iagro/iagro-panel.tgz -C .
-cd deploy && sudo docker compose run --rm migrar && sudo docker compose up -d --build panel
+~/Iagro/iagro-sistema/deploy/actualizar.sh
 ```
 
-El `.env` del servidor no se pisa (no va en el paquete).
+Baja los cambios de GitHub, reconstruye, aplica las migraciones nuevas y reinicia el panel. El `.env` del
+servidor no se toca (no está en git). Si cambió algún flujo de la carpeta `n8n/`, reimpórtalo en n8n.
