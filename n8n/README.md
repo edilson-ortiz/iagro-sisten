@@ -1,6 +1,6 @@
 # Flujos de n8n de IAGRO
 
-Todos usan la misma base (`trd`, credencial **Postgres account**) y la misma credencial de Chatwoot
+Todos usan la misma base (`iagro` en el servidor, credencial **Postgres account**) y la misma credencial de Chatwoot
 (**Header Auth account**, header `api_access_token`). La configuración (umbrales, horarios, plantillas,
 IDs de Chatwoot) se edita en el panel → **Configuración**; los flujos la leen en cada ejecución.
 
@@ -8,7 +8,7 @@ IDs de Chatwoot) se edita en el panel → **Configuración**; los flujos la leen
 
 | Archivo | Qué hace | Cuándo corre |
 |---|---|---|
-| `iagro-bot.json` | **Bot principal** (pronóstico, radar, registro con código, lluvias, alertas, fumigar, riego, satélite, feria). Versión oficial: cuando lo cambies en n8n, expórtalo (⋯ → Download) y reemplaza este archivo. | Webhook de Chatwoot (cada mensaje) |
+| `iagro-bot.json` | **Bot principal** (pronóstico, radar, registro con código, lluvias, alertas, fumigar, riego, satélite, feria). Versión oficial: cuando lo cambies en n8n, expórtalo (⋯ → Download) y reemplaza este archivo. Los clientes se leen y se registran en **`bot_clima.usuarios`** (nodos *Buscar Usuario por Teléfono* e *Insertar Nuevo Usuario*); `public.users` ya no se usa. | Webhook de Chatwoot (cada mensaje) |
 | `iagro-enviar-whatsapp.json` | **Sub-flujo.** Busca o crea el contacto en Chatwoot, lo vincula al inbox de WhatsApp, usa o abre la conversación y envía plantilla o texto. Lo usan los otros dos. | Cuando lo llaman |
 | `iagro-alerta-lluvia.json` | Revisa el pronóstico de cada cliente vigente; si llueve en ≤ 24 h y tiene las alertas activas, le envía la plantilla `notificacion_pronostico`. Guarda la próxima lluvia para el panel y desactiva a quien no responde N alertas seguidas. | Cada hora (minuto 5) |
 | `iagro-seguimiento-estados.json` | **Arriba:** webhook de Chatwoot → registra las respuestas a las alertas (botón tocado), el botón *Dejar de recibir* (desactiva y confirma) y *Activar alertas*. **Abajo:** cada 10 min consulta entregado/leído de las alertas. | Webhook + cada 10 min |

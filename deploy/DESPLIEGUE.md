@@ -105,8 +105,8 @@ Abre **https://iagro360.xyz** (landing), **https://iagro360.xyz/panel** (entra c
 ## 8. n8n (https://n8n.iagro360.xyz)
 
 1. **Bot principal:** abre *Iagro bot (IA clima completo)* → menú ⋯ → *Import from File* → `n8n/iagro-bot.json`
-   → **Save**. (Cambios: no responde "Dejar de recibir"/"Activar alertas", solo procesa mensajes entrantes,
-   enlace de registro `/registro`.)
+   → **Save**. (Cambios: los clientes se leen y se registran en `bot_clima.usuarios`; no responde
+   "Dejar de recibir"/"Activar alertas"; solo procesa mensajes entrantes; enlace de registro `/registro`.)
 2. **Importa, en este orden:** `iagro-enviar-whatsapp.json`, `iagro-alerta-lluvia.json`, `iagro-seguimiento-estados.json`.
    - En *Alerta de lluvia → Enviar WhatsApp* y en *Seguimiento → Confirmar al usuario*: elige el flujo *IAGRO · Enviar WhatsApp*.
    - Revisa que los nodos usen las credenciales **Postgres account** y **Header Auth account**.

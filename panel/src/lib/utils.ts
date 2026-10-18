@@ -56,7 +56,7 @@ export function urlVentusky(lat: number | null | undefined, lon: number | null |
   return `https://www.ventusky.com/es/${Number(lat).toFixed(3)};${Number(lon).toFixed(3)}`;
 }
 
-/** Página de radar IAGRO del usuario (mismo id que public.users) */
+/** Página de radar IAGRO del usuario (id de bot_clima.usuarios) */
 export function urlRadar(id: number): string {
   return `/radar/${id}`; // el sitio público es parte de esta misma app
 }

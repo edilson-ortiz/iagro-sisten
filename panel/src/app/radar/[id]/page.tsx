@@ -13,11 +13,11 @@ export const dynamic = 'force-dynamic';
 
 type Campo = { nombre: string | null; lat: number | null; lon: number | null };
 
-/** Campo del cliente directo de la base (el mismo id que usan el bot y el panel) */
+/** Campo del cliente (bot_clima.usuarios: la misma ficha que edita el panel y que usan el bot y las alertas) */
 const campo = cache(async (id: string): Promise<Campo | null> => {
   if (!/^\d{1,12}$/.test(id)) return null;
   const [c] = await query<Campo>(sql`
-    SELECT nombre_propiedad AS nombre, latitude AS lat, longitude AS lon FROM public.users WHERE id = ${Number(id)}`);
+    SELECT nombre, latitud AS lat, longitud AS lon FROM bot_clima.usuarios WHERE id = ${Number(id)}`);
   return c ?? null;
 });
 

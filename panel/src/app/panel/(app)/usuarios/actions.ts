@@ -86,10 +86,6 @@ export async function cambiarUbicacion(entrada: z.input<typeof esquemaUbicacion>
         UPDATE bot_clima.usuarios SET latitud = ${d.latitud}, longitud = ${d.longitud}, ubicacion_origen = 'panel'
          WHERE id = ${d.id} RETURNING id
       ),
-      radar AS (  -- el radar web (iagro360.xyz/radar/{id}) lee public.users
-        UPDATE public.users SET latitude = ${d.latitud}, longitude = ${d.longitud}, updated_at = now()
-         WHERE id IN (SELECT id FROM u) RETURNING id
-      ),
       pron AS (   -- la próxima lluvia guardada era de la ubicación anterior: se recalcula en la próxima revisión
         DELETE FROM bot_clima.pronosticos WHERE usuario_id IN (SELECT id FROM u) RETURNING usuario_id
       )

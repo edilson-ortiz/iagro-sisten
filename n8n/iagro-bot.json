@@ -435,28 +435,11 @@
     },
     {
       "parameters": {
-        "operation": "select",
-        "schema": {
-          "__rl": true,
-          "mode": "list",
-          "value": "public"
-        },
-        "table": {
-          "__rl": true,
-          "value": "users",
-          "mode": "list",
-          "cachedResultName": "users"
-        },
-        "limit": 1,
-        "where": {
-          "values": [
-            {
-              "column": "phone_number",
-              "value": "={{ $json.telefono }}"
-            }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "SELECT id, telefono AS phone_number, nombre AS nombre_propiedad,\n       latitud AS latitude, longitud AS longitude, activo AS is_active,\n       estado, vence_el, vigente, zona\n  FROM bot_clima.v_usuarios\n WHERE telefono = regexp_replace($1, '[^0-9]', '', 'g')\n LIMIT 1",
+        "options": {
+          "queryReplacement": "={{ [$json.telefono] }}"
+        }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
@@ -787,120 +770,11 @@
     },
     {
       "parameters": {
-        "schema": {
-          "__rl": true,
-          "value": "public",
-          "mode": "list",
-          "cachedResultName": "public"
-        },
-        "table": {
-          "__rl": true,
-          "value": "users",
-          "mode": "list",
-          "cachedResultName": "users"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "is_active": true,
-            "sensor_code": "EP999",
-            "latitude": "={{ $('Adjuntar Teléfono al Registro').first().json.lat }}",
-            "longitude": "={{ $('Adjuntar Teléfono al Registro').first().json.lng }}",
-            "phone_number": "={{ $('Adjuntar Teléfono al Registro').first().json.telefono }}",
-            "nombre_propiedad": "={{ $('Adjuntar Teléfono al Registro').first().json.nombre }}"
-          },
-          "matchingColumns": [
-            "id"
-          ],
-          "schema": [
-            {
-              "id": "id",
-              "displayName": "id",
-              "required": false,
-              "defaultMatch": true,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "phone_number",
-              "displayName": "phone_number",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "sensor_code",
-              "displayName": "sensor_code",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "is_active",
-              "displayName": "is_active",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "boolean",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "latitude",
-              "displayName": "latitude",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "longitude",
-              "displayName": "longitude",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "created_at",
-              "displayName": "created_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "updated_at",
-              "displayName": "updated_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "nombre_propiedad",
-              "displayName": "nombre_propiedad",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "WITH r AS (\n  SELECT * FROM bot_clima.registrar_usuario($1, $2, $3::double precision, $4::double precision, NULL, 'web')\n), codigo AS (\n  UPDATE public.user_tmp SET registrado = true, updated_at = now() WHERE codigo = $5\n)\nSELECT usuario_id AS id, es_nuevo, vence_el, dias_prueba FROM r",
+        "options": {
+          "queryReplacement": "={{ [ $('Adjuntar Teléfono al Registro').first().json.telefono, $('Adjuntar Teléfono al Registro').first().json.nombre, $('Adjuntar Teléfono al Registro').first().json.lat, $('Adjuntar Teléfono al Registro').first().json.lng, $('Adjuntar Teléfono al Registro').first().json.codigo ] }}"
+        }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
