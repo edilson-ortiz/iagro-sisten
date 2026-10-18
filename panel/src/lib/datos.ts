@@ -205,3 +205,19 @@ export async function datosChatwoot() {
     SELECT bot_clima.cfg_texto('chatwoot_url_publica', '') AS url, bot_clima.cfg_texto('chatwoot_account_id', '') AS cuenta`);
   return r!;
 }
+
+/** Nivel de alertas, invitaciones y si pidió no recibir mensajes (ficha) */
+export async function extrasDeUsuario(id: number) {
+  const [r] = await query<{
+    alertas_nivel: 'todas' | 'fuertes'; codigo_referido: string | null; amigos: number; premios: number;
+    invitado_por_id: number | null; invitado_por: string | null; de_baja: boolean;
+  }>(sql`
+    SELECT u.alertas_nivel, u.codigo_referido, u.referidos_premiados AS premios,
+           (SELECT count(*) FROM bot_clima.usuarios x WHERE x.referido_por = u.id)::int AS amigos,
+           u.referido_por AS invitado_por_id, p.nombre AS invitado_por,
+           EXISTS (SELECT 1 FROM bot_clima.bajas_whatsapp b WHERE b.telefono = u.telefono) AS de_baja
+      FROM bot_clima.usuarios u
+      LEFT JOIN bot_clima.usuarios p ON p.id = u.referido_por
+     WHERE u.id = ${id}`);
+  return r ?? null;
+}

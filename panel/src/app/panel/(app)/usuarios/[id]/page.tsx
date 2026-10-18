@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeftIcon, CloudSunIcon, ExternalLinkIcon, MapPinIcon, MessageCircleIcon, PhoneIcon, RadarIcon } from 'lucide-react';
 import { requerirSesion } from '@/lib/auth';
 import {
-  alertasDeUsuario, datosChatwoot, difusionesDeUsuario, hoyLocal, obtenerUsuario, pagosDeUsuario, planesActivos,
+  alertasDeUsuario, datosChatwoot, difusionesDeUsuario, extrasDeUsuario, hoyLocal, obtenerUsuario, pagosDeUsuario, planesActivos,
 } from '@/lib/datos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,9 +49,9 @@ export default async function FichaUsuarioPage({ params }: { params: Promise<{ i
   const u = await obtenerUsuario(id);
   if (!u) notFound();
 
-  const [pagos, alertas, difusiones, planes, hoy, cw, pron, tokens] = await Promise.all([
+  const [pagos, alertas, difusiones, planes, hoy, cw, pron, tokens, extras] = await Promise.all([
     pagosDeUsuario(id), alertasDeUsuario(id), MODULOS.difusiones ? difusionesDeUsuario(id) : Promise.resolve([]),
-    planesActivos(), hoyLocal(), datosChatwoot(), pronosticoDeUsuario(id), consumoDeUsuario(id),
+    planesActivos(), hoyLocal(), datosChatwoot(), pronosticoDeUsuario(id), consumoDeUsuario(id), extrasDeUsuario(id),
   ]);
   const falta = textoFalta(pron?.proxima_lluvia ?? null);
 
@@ -179,6 +179,21 @@ export default async function FichaUsuarioPage({ params }: { params: Promise<{ i
             </Dato>
             <Dato label="Alertas en los últimos 7 días">{u.alertas_7d}</Dato>
             <Dato label="Último mensaje del usuario">{u.ultimo_mensaje_el ? fmtFechaHora(u.ultimo_mensaje_el) : '—'}</Dato>
+            {extras?.alertas_nivel === 'fuertes' && u.alertas_activas && (
+              <Dato label="Nivel de alertas"><span className="text-estado-aviso">Solo lluvias fuertes</span></Dato>
+            )}
+            {extras && (
+              <Dato label="Invitaciones">
+                <span className="tabular-nums">{extras.amigos} amigo{extras.amigos === 1 ? '' : 's'}</span>
+                <span className="block text-xs font-normal text-muted-foreground">
+                  Código {extras.codigo_referido ?? '—'}{extras.premios > 0 && ` · ${extras.premios} premio(s)`}
+                  {extras.invitado_por_id && <> · lo invitó <Link href={`/panel/usuarios/${extras.invitado_por_id}`} className="underline">{extras.invitado_por ?? `#${extras.invitado_por_id}`}</Link></>}
+                </span>
+              </Dato>
+            )}
+            {extras?.de_baja && (
+              <Dato label="Difusiones"><span className="text-estado-vencido">Pidió no recibir (escribe ALTA para volver)</span></Dato>
+            )}
           </CardContent>
         </Card>
       </div>

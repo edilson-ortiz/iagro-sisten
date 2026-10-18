@@ -16,6 +16,7 @@ const UNIDAD: Record<string, string> = {
   respuesta_ventana_dias: 'días', difusion_pausa_ms: 'ms', difusion_pausar_sin_respuesta: 'difusiones',
   lluvia_pausar_sin_leer: 'alertas', lluvia_horas_para_leer: 'horas',
   tokens_mes: 'mensajes',
+  lluvia_fuerte_mm: 'mm', referidos_meta: 'amigos', referidos_premio_dias: 'días',
 };
 
 type Valor = string | boolean;

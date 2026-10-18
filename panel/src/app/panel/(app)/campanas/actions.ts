@@ -81,15 +81,21 @@ export async function crearCampana(entrada: z.input<typeof esquema>): Promise<Re
   const filas: { telefono: string; nombre: string | null; parametros: Record<string, string> }[] = [];
   let invalidos = 0;
   let repetidos = 0;
+  // Quien tocó "Dejar de recibir" no recibe difusiones (hasta que escriba ALTA)
+  const bajas = new Set((await query<{ telefono: string }>(sql`SELECT telefono FROM bot_clima.bajas_whatsapp`)).map((b) => b.telefono));
+  let deBaja = 0;
   for (const c of e.contactos) {
     const tel = normalizarTelefono(c.telefono);
     const parametros = Object.fromEntries(plantilla.variables.map((v) => [v, limpiarVariable(c.valores[v])]));
     if (!tel || Object.values(parametros).some((v) => !v)) { invalidos++; continue; }
     if (vistos.has(tel)) { repetidos++; continue; }
+    if (bajas.has(tel)) { deBaja++; continue; }
     vistos.add(tel);
     filas.push({ telefono: tel, nombre: c.nombre?.trim().slice(0, 150) || null, parametros });
   }
-  if (!filas.length) return { ok: false, error: 'Ningún contacto tiene un teléfono válido con todas las variables completas.' };
+  if (!filas.length) {
+    return { ok: false, error: deBaja ? 'Todos los contactos válidos pidieron no recibir mensajes.' : 'Ningún contacto tiene un teléfono válido con todas las variables completas.' };
+  }
 
   const cuando = e.programadaPara ? new Date(e.programadaPara) : new Date();
   try {
@@ -109,11 +115,11 @@ export async function crearCampana(entrada: z.input<typeof esquema>): Promise<Re
         ON CONFLICT (campana_id, telefono) DO NOTHING`);
     }
     await registrarLog('info', 'panel:difusiones', 'Difusión creada', {
-      id: c!.id, nombre: e.nombre, plantilla: plantilla.nombre, contactos: filas.length, invalidos, repetidos,
+      id: c!.id, nombre: e.nombre, plantilla: plantilla.nombre, contactos: filas.length, invalidos, repetidos, deBaja,
       programada_para: cuando.toISOString(), admin: sesion.usuario,
     });
     revalidatePath('/panel/campanas');
-    const extra = [invalidos && `${invalidos} sin teléfono válido o con variables vacías`, repetidos && `${repetidos} repetidos`].filter(Boolean);
+    const extra = [invalidos && `${invalidos} sin teléfono válido o con variables vacías`, repetidos && `${repetidos} repetidos`, deBaja && `${deBaja} que pidieron no recibir mensajes`].filter(Boolean);
     return {
       ok: true, id: c!.id,
       mensaje: `Difusión creada con ${filas.length.toLocaleString('es-BO')} contactos${extra.length ? ` (se omitieron ${extra.join(' y ')})` : ''}.`,

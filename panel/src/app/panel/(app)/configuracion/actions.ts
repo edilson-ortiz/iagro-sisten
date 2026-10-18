@@ -11,6 +11,9 @@ const LIMITES: Record<string, [number, number]> = {
   prueba_dias: [0, 365],
   pago_dias: [1, 3650],
   tokens_mes: [0, 100000],
+  lluvia_fuerte_mm: [1, 500],
+  referidos_meta: [1, 100],
+  referidos_premio_dias: [1, 365],
   lluvia_umbral: [1, 99],
   lluvia_horas_anticipacion: [1, 72],
   lluvia_max_por_semana: [1, 14],
@@ -71,6 +74,7 @@ export async function guardarConfig(cambios: Record<string, string | boolean>): 
         const t = String(crudo);
         if (t.length > 4000) return { ok: false, error: `"${f.etiqueta}" es demasiado largo.` };
         if (clave === 'n8n_webhook_difusion' && t && !/^https?:\/\/\S+$/.test(t)) return { ok: false, error: 'La URL del webhook debe empezar con http:// o https://' };
+        if (clave === 'whatsapp_numero' && !/^\d{10,15}$/.test(t.trim())) return { ok: false, error: 'El número de WhatsApp va con código de país y sin +, ej. 59176762207.' };
         valor = t.trim();
       }
     }

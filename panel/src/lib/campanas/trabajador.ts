@@ -75,6 +75,13 @@ async function enviarPendientes(conf: Conf) {
                 c.inbox_id, c.plantilla_nombre, c.plantilla_idioma, c.plantilla_categoria, c.plantilla_cuerpo`);
     if (!d) break;
 
+    // Pidió no recibir mensajes después de crearse la difusión: no se le envía
+    const [baja] = await query<{ x: number }>(sql`SELECT 1 AS x FROM bot_clima.bajas_whatsapp WHERE telefono = ${d.telefono}`);
+    if (baja) {
+      await query(sql`UPDATE bot_clima.campana_destinatarios SET estado = 'fallido', error = 'Pidió no recibir mensajes (Dejar de recibir)', actualizado_el = now() WHERE id = ${d.id}`);
+      continue;
+    }
+
     try {
       const { contactoId, conversacionId } = await prepararConversacion(conf, d.inbox_id, d.telefono, d.nombre);
       const mensajeId = await enviarPlantilla(conf, conversacionId, {

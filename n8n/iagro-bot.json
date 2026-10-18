@@ -182,7 +182,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\n// Chatwoot envia el texto en body.content\nconst textoOriginal = ($json.body?.content || '').trim();\nconst texto = textoOriginal.toLowerCase();\n// Version sin acentos para comparar palabras clave\nconst t = texto.normalize('NFD').replace(/[̀-ͯ]/g, '');\n\n// \"Dejar de recibir\" / \"Activar alertas\" (botones de la plantilla de alertas) los atiende el flujo\n// \"IAGRO · Seguimiento de estados\": desactiva/activa en el panel y confirma. El bot no responde.\nif (/^(dejar de recibir|no recibir alertas|desactivar alertas|activar alertas|recibir alertas)$/.test(t)) return [];\n\nconst telefonoRaw = $json.body?.conversation?.meta?.sender?.phone_number || '';\nconst telefono = telefonoRaw.replace('+', '');\n\nlet intent = 'desconocido';\nlet codigo = null;\nlet lluvia = null;          // { mm, fecha, lote } cuando se registra lluvia\nlet satelite_tipo = null;   // parcela | nubes | ndvi\nlet lluvia_error = null;\n\n// =====================================================\n// DETECTAR REGISTRO IAGRO\n// Formato esperado:\n// [IAGRO]:[BZuABk2]\n// =====================================================\nconst registroMatch = textoOriginal.match(/^\\s*\\[IAGRO\\]\\s*:\\s*\\[([A-Za-z0-9_-]+)\\]/i);\n\nif (registroMatch) {\n  intent = 'registro';\n  codigo = registroMatch[1];\n}\n\n// =====================================================\n// FERIA AGRO VIDAS + UBICACIÓN DEL LOTE\n// Va antes de las palabras clave: \"FERIA - Quiero el clima de mi zona\" contiene \"clima\"\n// Los botones de WhatsApp llegan con su TÍTULO como texto, por eso se detectan por palabras\n// =====================================================\nlet ubicacion = null;       // { lat, lon, nombre? } del lote, zona elegida o feria\nconst normalizar = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();\n\nlet zonas = [];\ntry { zonas = JSON.parse($json.feria_zonas || '[]'); } catch (e) { zonas = []; }\nconst adjuntoUbicacion = ($json.body?.attachments || []).find(a => a.file_type === 'location' && a.coordinates_lat != null);\nconst zonaElegida = zonas.find(z => normalizar(z.nombre) === t.replace(/^zona\\s+/, '').trim());\n\nlet sectores = [];\ntry { sectores = JSON.parse($json.feria_sectores || '[]'); } catch (e) { sectores = []; }\nconst soloLetras = (s) => normalizar(s).replace(/[^a-z0-9 ]/g, '').trim();\nconst sectorElegido = sectores.find(s => soloLetras(s.nombre) === soloLetras(t));\nlet feria_sector = null;\n\nif (intent === 'desconocido') {\n  if (adjuntoUbicacion) {\n    intent = 'ubicacion';\n    ubicacion = { lat: Number(adjuntoUbicacion.coordinates_lat), lon: Number(adjuntoUbicacion.coordinates_long) };\n  } else if (zonaElegida) {\n    intent = 'feria_zona';\n    ubicacion = { lat: Number(zonaElegida.lat), lon: Number(zonaElegida.lon), nombre: zonaElegida.nombre };\n  } else if (sectorElegido) {\n    intent = 'feria_sector';\n    feria_sector = sectorElegido.nombre;\n  } else if (/\\bguia\\b|sectores|recorrido|\\btour\\b/.test(t)) {\n    intent = 'feria_guia';\n  } else if (/elegir mi zona|lista de zonas|^zonas?$/.test(t)) {\n    intent = 'feria_zonas';\n  } else if (/\\bstand\\b/.test(t)) {\n    intent = 'feria_stand';\n  } else if (/clima (de |en )?(la )?feria/.test(t)) {\n    intent = 'feria_clima';\n  } else if (/invitar|referido/.test(t)) {\n    intent = 'feria_invitar';\n  } else if (/^feria\\b|agro ?vidas/.test(t)) {\n    intent = 'feria';\n  }\n}\n\nif (intent === 'feria' || intent === 'feria_clima') {\n  ubicacion = { lat: Number($json.feria_lat), lon: Number($json.feria_lon), nombre: $json.feria_nombre || 'Agro Vidas' };\n}\n// Endpoint de la API de clima que necesita cada intención de feria (null = no consulta clima)\nconst clima_endpoint = intent === 'feria' ? 'hourly'\n  : ['feria_clima', 'ubicacion', 'feria_zona'].includes(intent) ? 'next24h'\n  : null;\n\n\n// =====================================================\n// REGISTRO RAPIDO DE LLUVIA\n// Ej: \"llovio 15 mm\", \"cayeron 8,5 milimetros ayer en el lote norte\", \"lluvia 12mm 05/10\"\n// =====================================================\nif (intent === 'desconocido' && /(llov|lluvi|cayo|cayeron|registr|anot|pluvio)/.test(t)) {\n  // Fecha explicita dd/mm o dd/mm/aaaa (se quita del texto para no confundirla con los mm)\n  let fecha = $now.toISODate();\n  let resto = t;\n  const fm = t.match(/\\b(\\d{1,2})[\\/-](\\d{1,2})(?:[\\/-](\\d{2,4}))?\\b/);\n  if (fm) {\n    const anio = fm[3] ? (fm[3].length === 2 ? 2000 + Number(fm[3]) : Number(fm[3])) : $now.year;\n    const f = DateTime.fromObject({ year: anio, month: Number(fm[2]), day: Number(fm[1]) });\n    if (f.isValid) fecha = f.toISODate();\n    resto = t.replace(fm[0], ' ');\n  } else if (/antier|anteayer/.test(t)) {\n    fecha = $now.minus({ days: 2 }).toISODate();\n  } else if (/\\bayer\\b|anoche/.test(t)) {\n    fecha = $now.minus({ days: 1 }).toISODate();\n  }\n\n  const conUnidad = resto.match(/(\\d+(?:[.,]\\d+)?)\\s*(mm|milimetros?|ml)\\b/);\n  const soloNumero = /(llovio|llovieron|cayo|cayeron)/.test(resto) ? resto.match(/\\b(\\d+(?:[.,]\\d+)?)\\b/) : null;\n  const m = conUnidad || soloNumero;\n\n  if (m) {\n    const mm = Math.round(parseFloat(m[1].replace(',', '.')) * 10) / 10;\n    const loteMatch = textoOriginal.match(/en\\s+(?:el\\s+|la\\s+)?(lote|parcela|potrero|chacra|campo|sector)\\s+([\\wáéíóúñÁÉÍÓÚÑ-]{1,30})/i);\n    const lote = loteMatch\n      ? `${loteMatch[1].charAt(0).toUpperCase()}${loteMatch[1].slice(1).toLowerCase()} ${loteMatch[2]}`\n      : 'Lote principal';\n\n    if (fecha > $now.toISODate()) {\n      intent = 'lluvia_ayuda';\n      lluvia_error = 'La fecha no puede ser futura.';\n    } else if (mm < 0 || mm > 500) {\n      intent = 'lluvia_ayuda';\n      lluvia_error = 'La cantidad debe estar entre 0 y 500 mm.';\n    } else {\n      intent = 'lluvia_registro';\n      lluvia = { mm, fecha, lote };\n    }\n  }\n}\n\n// =====================================================\n// INTENCIONES NORMALES\n// El orden importa: la primera que coincide gana.\n// (agregar nuevas palabras clave aqui = escala sin tocar el resto del flujo)\n// Las palabras van SIN acentos porque se comparan contra el texto normalizado.\n// =====================================================\nif (intent === 'desconocido') {\n  const intents = {\n    lluvia_historial: ['historial', 'mis lluvias', 'cuanto llovio', 'acumulado', 'mis registros', 'cuaderno'],\n    lluvia_ayuda: ['registrar lluvia', 'anotar lluvia', 'pluviometro', 'registrar'],\n    alertas: ['alerta', 'helada', 'granizo', 'tormenta', 'riesgo', 'peligro'],\n    fumigar: ['fumig', 'pulveriz', 'asperj', 'aplicar'],\n    riego: ['riego', 'regar', 'evapotrans'],\n    viento: ['viento', 'vientos', 'rafaga', 'racha', 'ventarron', 'ventisca'],\n    satelite: ['satel', 'imagen', 'ndvi', 'nubes', 'vegetacion', 'salud del cultivo', 'mi parcela', 'foto'],\n    planes: ['planes', 'plan pro', 'precio', 'premium', 'suscrib', 'pagar', 'costo', 'cuanto cuesta'],\n    pronostico: ['pronostico', 'clima', 'lluvia', 'tiempo', 'llover', 'llueve'],\n    radar: ['radar'],\n    saludo: ['hola', 'buenas', 'buenos dias', 'buen dia'],\n    ayuda: ['ayuda', 'menu', 'opciones'],\n    saludo_final: ['gracias', 'ok', 'perfecto', 'listo', 'entendido', 'hasta luego', 'adios', 'chau', 'nos vemos']\n  };\n\n  for (const [nombre, palabras] of Object.entries(intents)) {\n    if (palabras.some(p => t.includes(p))) {\n      intent = nombre;\n      break;\n    }\n  }\n}\n\nif (intent === 'satelite') {\n  satelite_tipo = /ndvi|vegetacion|salud/.test(t) ? 'ndvi' : /nube/.test(t) ? 'nubes' : 'parcela';\n}\n\n// Intenciones que requieren usuario registrado (pasan por un solo IF)\nconst SERVICIOS = ['lluvia_registro', 'lluvia_historial', 'alertas', 'fumigar', 'riego', 'viento', 'satelite'];\n\nreturn [{\n  json: {\n    ...$json,\n    intent,\n    es_servicio: SERVICIOS.includes(intent) ? 'si' : 'no',\n    texto_original: textoOriginal,\n    texto,\n    codigo,\n    lluvia,\n    lluvia_error,\n    satelite_tipo,\n    ubicacion,\n    clima_endpoint,\n    feria_sector,\n    clima_lat: ubicacion?.lat ?? null,\n    clima_lon: ubicacion?.lon ?? null,\n    conversation_id: $json.body?.conversation?.id,\n    account_id: $json.body?.account?.id,\n    contact_name: $json.body?.conversation?.meta?.sender?.name || 'Cliente',\n    telefono\n  }\n}];\n"
+        "jsCode": "\n// Chatwoot envia el texto en body.content\nconst textoOriginal = ($json.body?.content || '').trim();\nconst texto = textoOriginal.toLowerCase();\n// Version sin acentos para comparar palabras clave\nconst t = texto.normalize('NFD').replace(/[̀-ͯ]/g, '');\n\n// \"Dejar de recibir\" / \"Activar alertas\" (botones de la plantilla de alertas) los atiende el flujo\n// \"IAGRO · Seguimiento de estados\": desactiva/activa en el panel y confirma. El bot no responde.\nconst tBoton = t.replace(/^[^a-z0-9]+/, '').trim();   // \"⛈️ Solo lluvias fuertes\" → \"solo lluvias fuertes\"\nif (/^(dejar de recibir|no recibir alertas|desactivar alertas|activar alertas|recibir alertas|alta|solo lluvias fuertes)$/.test(tBoton)) return [];\n\nconst telefonoRaw = $json.body?.conversation?.meta?.sender?.phone_number || '';\nconst telefono = telefonoRaw.replace('+', '');\n\nlet intent = 'desconocido';\nlet codigo = null;\nlet lluvia = null;          // { mm, fecha, lote } cuando se registra lluvia\nlet satelite_tipo = null;   // parcela | nubes | ndvi\nlet lluvia_error = null;\n\n// =====================================================\n// DETECTAR REGISTRO IAGRO\n// Formato esperado:\n// [IAGRO]:[BZuABk2]\n// =====================================================\nconst registroMatch = textoOriginal.match(/^\\s*\\[IAGRO\\]\\s*:\\s*\\[([A-Za-z0-9_-]+)\\]/i);\n\nif (registroMatch) {\n  intent = 'registro';\n  codigo = registroMatch[1];\n}\n\n// Invitación de un amigo (enlace wa.me del botón \"Invitar amigos\"): \"Quiero alertas IAgro R7K2\"\nlet codigo_invitado = null;\nconst invitacion = t.match(/quiero alertas iagro\\s+([a-z0-9]{4,8})/);\nif (intent === 'desconocido' && invitacion) {\n  intent = 'reg_inicio';\n  codigo_invitado = invitacion[1].toUpperCase();\n}\n\n// =====================================================\n// FERIA AGRO VIDAS + UBICACIÓN DEL LOTE\n// Va antes de las palabras clave: \"FERIA - Quiero el clima de mi zona\" contiene \"clima\"\n// Los botones de WhatsApp llegan con su TÍTULO como texto, por eso se detectan por palabras\n// =====================================================\nlet ubicacion = null;       // { lat, lon, nombre? } del lote, zona elegida o feria\nconst normalizar = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();\n\nlet zonas = [];\ntry { zonas = JSON.parse($json.feria_zonas || '[]'); } catch (e) { zonas = []; }\nconst adjuntoUbicacion = ($json.body?.attachments || []).find(a => a.file_type === 'location' && a.coordinates_lat != null);\nconst zonaElegida = zonas.find(z => normalizar(z.nombre) === t.replace(/^zona\\s+/, '').trim());\n\nlet sectores = [];\ntry { sectores = JSON.parse($json.feria_sectores || '[]'); } catch (e) { sectores = []; }\nconst soloLetras = (s) => normalizar(s).replace(/[^a-z0-9 ]/g, '').trim();\nconst sectorElegido = sectores.find(s => soloLetras(s.nombre) === soloLetras(t));\nlet feria_sector = null;\n\nif (intent === 'desconocido') {\n  if (adjuntoUbicacion) {\n    intent = 'ubicacion';\n    ubicacion = { lat: Number(adjuntoUbicacion.coordinates_lat), lon: Number(adjuntoUbicacion.coordinates_long) };\n  } else if (zonaElegida) {\n    intent = 'feria_zona';\n    ubicacion = { lat: Number(zonaElegida.lat), lon: Number(zonaElegida.lon), nombre: zonaElegida.nombre };\n  } else if (sectorElegido) {\n    intent = 'feria_sector';\n    feria_sector = sectorElegido.nombre;\n  } else if (/\\bguia\\b|sectores|recorrido|\\btour\\b/.test(t)) {\n    intent = 'feria_guia';\n  } else if (/elegir mi zona|lista de zonas|^zonas?$/.test(t)) {\n    intent = 'feria_zonas';\n  } else if (/\\bstand\\b/.test(t)) {\n    intent = 'feria_stand';\n  } else if (/clima (de |en )?(la )?feria/.test(t)) {\n    intent = 'feria_clima';\n  } else if (/invitar|referido/.test(t)) {\n    intent = 'invitar';   // \"📤 Invitar amigos\": imagen con su enlace de invitación\n  } else if (/^feria\\b|agro ?vidas/.test(t)) {\n    intent = 'feria';\n  }\n}\n\nif (intent === 'feria' || intent === 'feria_clima') {\n  ubicacion = { lat: Number($json.feria_lat), lon: Number($json.feria_lon), nombre: $json.feria_nombre || 'Agro Vidas' };\n}\n// Endpoint de la API de clima que necesita cada intención de feria (null = no consulta clima)\nconst clima_endpoint = intent === 'feria' ? 'hourly'\n  : ['feria_clima', 'ubicacion', 'feria_zona'].includes(intent) ? 'next24h'\n  : null;\n\n\n// =====================================================\n// REGISTRO RAPIDO DE LLUVIA\n// Ej: \"llovio 15 mm\", \"cayeron 8,5 milimetros ayer en el lote norte\", \"lluvia 12mm 05/10\"\n// =====================================================\nif (intent === 'desconocido' && /(llov|lluvi|cayo|cayeron|registr|anot|pluvio)/.test(t)) {\n  // Fecha explicita dd/mm o dd/mm/aaaa (se quita del texto para no confundirla con los mm)\n  let fecha = $now.toISODate();\n  let resto = t;\n  const fm = t.match(/\\b(\\d{1,2})[\\/-](\\d{1,2})(?:[\\/-](\\d{2,4}))?\\b/);\n  if (fm) {\n    const anio = fm[3] ? (fm[3].length === 2 ? 2000 + Number(fm[3]) : Number(fm[3])) : $now.year;\n    const f = DateTime.fromObject({ year: anio, month: Number(fm[2]), day: Number(fm[1]) });\n    if (f.isValid) fecha = f.toISODate();\n    resto = t.replace(fm[0], ' ');\n  } else if (/antier|anteayer/.test(t)) {\n    fecha = $now.minus({ days: 2 }).toISODate();\n  } else if (/\\bayer\\b|anoche/.test(t)) {\n    fecha = $now.minus({ days: 1 }).toISODate();\n  }\n\n  const conUnidad = resto.match(/(\\d+(?:[.,]\\d+)?)\\s*(mm|milimetros?|ml)\\b/);\n  const soloNumero = /(llovio|llovieron|cayo|cayeron)/.test(resto) ? resto.match(/\\b(\\d+(?:[.,]\\d+)?)\\b/) : null;\n  const m = conUnidad || soloNumero;\n\n  if (m) {\n    const mm = Math.round(parseFloat(m[1].replace(',', '.')) * 10) / 10;\n    const loteMatch = textoOriginal.match(/en\\s+(?:el\\s+|la\\s+)?(lote|parcela|potrero|chacra|campo|sector)\\s+([\\wáéíóúñÁÉÍÓÚÑ-]{1,30})/i);\n    const lote = loteMatch\n      ? `${loteMatch[1].charAt(0).toUpperCase()}${loteMatch[1].slice(1).toLowerCase()} ${loteMatch[2]}`\n      : 'Lote principal';\n\n    if (fecha > $now.toISODate()) {\n      intent = 'lluvia_ayuda';\n      lluvia_error = 'La fecha no puede ser futura.';\n    } else if (mm < 0 || mm > 500) {\n      intent = 'lluvia_ayuda';\n      lluvia_error = 'La cantidad debe estar entre 0 y 500 mm.';\n    } else {\n      intent = 'lluvia_registro';\n      lluvia = { mm, fecha, lote };\n    }\n  }\n}\n\n// =====================================================\n// INTENCIONES NORMALES\n// El orden importa: la primera que coincide gana.\n// (agregar nuevas palabras clave aqui = escala sin tocar el resto del flujo)\n// Las palabras van SIN acentos porque se comparan contra el texto normalizado.\n// =====================================================\n// \"¿A qué hora llueve?\" (botón de la plantilla de alertas o texto)\nif (intent === 'desconocido' && /a que hora llueve|que hora llueve|hora de (la )?lluvia|cuando llueve|a que hora va a llover/.test(t)) {\n  intent = 'hora_lluvia';\n}\n\nif (intent === 'desconocido') {\n  const intents = {\n    lluvia_historial: ['historial', 'mis lluvias', 'cuanto llovio', 'acumulado', 'mis registros', 'cuaderno'],\n    lluvia_ayuda: ['registrar lluvia', 'anotar lluvia', 'pluviometro', 'registrar'],\n    alertas: ['alerta', 'helada', 'granizo', 'tormenta', 'riesgo', 'peligro'],\n    fumigar: ['fumig', 'pulveriz', 'asperj', 'aplicar'],\n    riego: ['riego', 'regar', 'evapotrans'],\n    viento: ['viento', 'vientos', 'rafaga', 'racha', 'ventarron', 'ventisca'],\n    satelite: ['satel', 'imagen', 'ndvi', 'nubes', 'vegetacion', 'salud del cultivo', 'mi parcela', 'foto'],\n    planes: ['planes', 'plan pro', 'precio', 'premium', 'suscrib', 'pagar', 'costo', 'cuanto cuesta'],\n    pronostico: ['pronostico', 'clima', 'lluvia', 'tiempo', 'llover', 'llueve'],\n    radar: ['radar'],\n    saludo: ['hola', 'buenas', 'buenos dias', 'buen dia'],\n    ayuda: ['ayuda', 'menu', 'opciones'],\n    saludo_final: ['gracias', 'ok', 'perfecto', 'listo', 'entendido', 'hasta luego', 'adios', 'chau', 'nos vemos']\n  };\n\n  for (const [nombre, palabras] of Object.entries(intents)) {\n    if (palabras.some(p => t.includes(p))) {\n      intent = nombre;\n      break;\n    }\n  }\n}\n\nif (intent === 'satelite') {\n  satelite_tipo = /ndvi|vegetacion|salud/.test(t) ? 'ndvi' : /nube/.test(t) ? 'nubes' : 'parcela';\n}\n\n// Intenciones que requieren usuario registrado (pasan por un solo IF)\nconst SERVICIOS = ['lluvia_registro', 'lluvia_historial', 'alertas', 'fumigar', 'riego', 'viento', 'satelite'];\n\nreturn [{\n  json: {\n    ...$json,\n    intent,\n    es_servicio: SERVICIOS.includes(intent) ? 'si' : 'no',\n    texto_original: textoOriginal,\n    texto,\n    codigo,\n    codigo_invitado,\n    lluvia,\n    lluvia_error,\n    satelite_tipo,\n    ubicacion,\n    clima_endpoint,\n    feria_sector,\n    clima_lat: ubicacion?.lat ?? null,\n    clima_lon: ubicacion?.lon ?? null,\n    conversation_id: $json.body?.conversation?.id,\n    account_id: $json.body?.account?.id,\n    contact_name: $json.body?.conversation?.meta?.sender?.name || 'Cliente',\n    telefono\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -230,7 +230,7 @@
                 "conditions": [
                   {
                     "id": "r-pronostico",
-                    "leftValue": "={{ $json.intent }}",
+                    "leftValue": "={{ ['pronostico', 'hora_lluvia'].includes($json.intent) ? 'pronostico' : 'otro' }}",
                     "rightValue": "pronostico",
                     "operator": {
                       "type": "string",
@@ -417,6 +417,28 @@
                 ],
                 "combinator": "and"
               }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-registro-chat",
+                    "leftValue": "={{ $json.intent.startsWith('reg_') || $json.intent === 'invitar' ? 'registro_chat' : 'otro' }}",
+                    "rightValue": "registro_chat",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
             }
           ]
         },
@@ -436,7 +458,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT id, telefono AS phone_number, nombre AS nombre_propiedad,\n       latitud AS latitude, longitud AS longitude, activo AS is_active,\n       estado, vence_el, vigente, zona\n  FROM bot_clima.v_usuarios\n WHERE telefono = regexp_replace($1, '[^0-9]', '', 'g')\n LIMIT 1",
+        "query": "SELECT v.id, v.telefono AS phone_number, v.nombre AS nombre_propiedad,\n       v.latitud AS latitude, v.longitud AS longitude, v.activo AS is_active,\n       v.estado, v.vence_el, v.vigente, v.zona,\n       rc.estado AS chat_estado, rc.pedido AS chat_pedido, rc.departamento AS chat_departamento, rc.opciones AS chat_opciones\n  FROM (SELECT regexp_replace($1, '[^0-9]', '', 'g') AS tel) t\n  LEFT JOIN bot_clima.v_usuarios v ON v.telefono = t.tel\n  LEFT JOIN bot_clima.registro_chat rc ON rc.telefono = t.tel AND rc.actualizado_el > now() - interval '24 hours'\n LIMIT 1",
         "options": {
           "queryReplacement": "={{ [$json.telefono] }}"
         }
@@ -459,7 +481,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\n// Postgres reemplaza $json con las columnas de la tabla (o vacio si no hay match).\n// Aqui lo recuperamos y lo adjuntamos como un solo objeto \"usuario\", conservando\n// todos los datos del mensaje original (intent, telefono, codigo, etc.)\nconst usuario = $json && $json.id ? $json : {};\nconst original = $('Parsear Mensaje y Detectar Intención').first().json;\n\nreturn [{\n  json: {\n    ...original,\n    usuario\n  }\n}];\n"
+        "jsCode": "// Postgres devuelve una fila con el cliente (si existe) y su registro por chat en curso (si hay).\n// Se adjuntan como \"usuario\" y \"chat\", conservando los datos del mensaje (intent, telefono, codigo, etc.)\nconst fila = $json || {};\nconst usuario = fila.id ? fila : {};\nconst chat = { estado: fila.chat_estado || null, pedido: fila.chat_pedido || 'fc', departamento: fila.chat_departamento || null, opciones: fila.chat_opciones || null };\nconst original = $('Parsear Mensaje y Detectar Intención').first().json;\nconst registrado = !!usuario.id;\nlet intent = original.intent;\nlet reg_pedido = chat.pedido;\n\n// ===== Registro por WhatsApp (docs/prototipos/registro-por-whatsapp.html) =====\nconst PIDE_SERVICIO = ['pronostico', 'hora_lluvia', 'radar', 'alertas', 'fumigar', 'riego', 'viento', 'satelite', 'lluvia_registro', 'lluvia_historial'];\nconst NORMALES = ['saludo', 'ayuda', 'saludo_final', 'planes', 'registro', 'invitar'];\nif (intent === 'ubicacion') {\n  intent = 'reg_ubicacion';            // 📎 ubicación: registra el lote (o lo actualiza si ya es cliente)\n} else if (!registrado && chat.estado && !NORMALES.includes(intent) && intent !== 'reg_inicio') {\n  intent = 'reg_respuesta';            // contesta la pregunta del registro: ciudad, lista u opción\n} else if (!registrado && (PIDE_SERVICIO.includes(intent) || intent === 'reg_inicio')) {\n  reg_pedido = intent === 'hora_lluvia' ? 'hora' : 'fc';\n  intent = 'reg_inicio';               // pide la ubicación del lote\n} else if (registrado && intent === 'reg_inicio') {\n  intent = 'saludo';                   // ya es cliente y escribió con un código de invitación\n}\n\nreturn [{ json: { ...original, intent, usuario, chat, reg_pedido } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -596,7 +618,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const data = $json.data || [];\nconst usuario = $('Buscar Usuario por Teléfono').first().json;\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\n// ===== Ajustes =====\nconst MM_MINIMO = 1;        // menos de esto en el día NO se considera lluvia (para \"Próxima lluvia\")\nconst VIENTO_FUMIGAR = 20;  // km/h: desde aquí no se recomienda fumigar\nconst DIAS_LISTA = 8;       // cuántos días van en \"Próximos días\"\n\n// ===== Funciones auxiliares =====\nconst num = (v) => parseFloat(v);\n\nconst avgWind = (horarios) => {\n  const vals = horarios.map(h => num(h.vsd)).filter(v => !isNaN(v));\n  return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;\n};\n\nconst avgWindDir = (horarios) => {\n  const dirs = horarios.map(h => h.vdId).filter(Boolean);\n  if (!dirs.length) return '';\n  const freq = {};\n  dirs.forEach(d => freq[d] = (freq[d] || 0) + 1);\n  return Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];\n};\n\nconst temps = (horarios) => horarios.map(h => num(h.td)).filter(v => !isNaN(v));\nconst maxTemp = (horarios) => { const t = temps(horarios); return t.length ? Math.round(Math.max(...t)) : '-'; };\nconst minTemp = (horarios) => { const t = temps(horarios); return t.length ? Math.round(Math.min(...t)) : '-'; };\n\nconst totalMm = (horarios) => horarios.reduce((s, h) => s + (num(h.sr) || 0), 0);\n\n// Formato de mm: entero si es grande, 1 decimal si es poco\nconst fmtMm = (mm) => mm >= 1 ? String(Math.round(mm)) : (Math.round(mm * 10) / 10).toFixed(1);\n\nconst parseFecha = (fecha) => {\n  const [dia, mes, anio] = fecha.split('/');\n  return new Date(anio, mes - 1, dia, 12); // evita errores de zona horaria\n};\nconst nombreLargo = (f) => ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][parseFecha(f).getDay()];\nconst nombreCorto = (f) => ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][parseFecha(f).getDay()];\nconst ddmm = (f) => f.slice(0, 5); // \"06/10/2026\" -> \"06/10\"\n\n// ===== Procesar días (hoy + DIAS_LISTA días siguientes) =====\nconst dias = data.slice(0, 1 + DIAS_LISTA).map(dia => {\n  const horarios = dia.horarios || [];\n  const mm = totalMm(horarios);\n  const horasLluvia = horarios.filter(h => num(h.sr) > 0);\n  // Hora de inicio: primera hora con lluvia\n  const primera = horasLluvia[0];\n  // Probabilidad: la máxima de las horas con lluvia\n  const prob = horasLluvia.length ? Math.max(...horasLluvia.map(h => num(h.rp) || 0)) : 0;\n  return {\n    fecha: dia.fecha,\n    minT: minTemp(horarios),\n    maxT: maxTemp(horarios),\n    viento: avgWind(horarios),\n    dir: avgWindDir(horarios),\n    mm,\n    llueve: mm >= MM_MINIMO,\n    lluviaLigera: mm > 0 && mm < MM_MINIMO,\n    horaInicio: primera ? primera.h : null,\n    prob,\n  };\n});\n\n// ===== Armar mensaje =====\nlet mensaje = `🌦️ **${usuario.nombre_propiedad}**\\n`;\n\nif (dias.length) {\n  const hoy = dias[0];\n\n  // HOY\n  mensaje += `\\n📍 *Hoy ${nombreLargo(hoy.fecha)} ${ddmm(hoy.fecha)}*\\n`;\n  mensaje += `🌡️ ${hoy.minT}° / ${hoy.maxT}°C  ·  💨 ${hoy.viento} km/h ${hoy.dir}\\n`;\n\n  // PRÓXIMA LLUVIA (depende del umbral MM_MINIMO)\n  const proxima = dias.find(d => d.llueve);\n  if (proxima) {\n    const cuando = proxima === hoy\n      ? 'hoy'\n      : `${nombreLargo(proxima.fecha)} ${ddmm(proxima.fecha)}`;\n    mensaje += `\\n🌧️ *Próxima lluvia:* ${cuando} desde las ${proxima.horaInicio}\\n`;\n    mensaje += `Se esperan unos ${Math.round(proxima.mm)} mm (probabilidad ${proxima.prob}%)\\n`;\n  } else {\n    mensaje += `\\n☀️ *Sin lluvias importantes en los próximos días*\\n`;\n  }\n\n  // PRÓXIMOS DÍAS (una línea por día)\n  mensaje += `\\n📅 *Próximos días*\\n`;\n  for (const d of dias.slice(1, 1 + DIAS_LISTA)) {\n    let icono, extra;\n    if (d.llueve) {\n      icono = '🌧️';\n      extra = `💧 ${fmtMm(d.mm)} mm`;\n    } else if (d.lluviaLigera) {\n      icono = '🌦️';\n      extra = `💧 ${fmtMm(d.mm)} mm`;\n    } else {\n      icono = '☀️';\n      extra = `💨 ${d.viento}`;\n    }\n    mensaje += `${nombreCorto(d.fecha)} ${ddmm(d.fecha)} ${icono} ${d.minT}°–${d.maxT}° ${extra}\\n`;\n  }\n\n  // RECOMENDACIÓN\n  const proximos3 = dias.slice(0, 3);\n  const ventosos = proximos3.filter(d => d.viento >= VIENTO_FUMIGAR).length;\n  const calorExtremo = proximos3.some(d => d.maxT !== '-' && d.maxT > 35);\n  const frio = proximos3.some(d => d.minT !== '-' && d.minT < 16);\n\n  const avisos = [];\n  if (proxima && proxima !== hoy) {\n    const diasSecos = dias.indexOf(proxima);\n    if (diasSecos >= 2) avisos.push(`${diasSecos} días secos antes de la lluvia`);\n  }\n  if (ventosos >= 2) avisos.push('⚠️ viento fuerte, no recomendable fumigar');\n  else if (!proxima || proxima !== hoy) avisos.push('✅ buen momento para aplicaciones en días de poco viento');\n  if (calorExtremo) avisos.push('🌡️ calor extremo');\n  if (frio) avisos.push('🥶 temperaturas frías');\n\n  if (avisos.length) mensaje += `\\n💡 *Resumen:* ${avisos.join(' · ')}\\n`;\n}\n\nmensaje += `\\n🌐 Radar en vivo: https://iagro360.xyz/radar/${usuario.id}\\n`;\nmensaje += `\\n📡 _IAGRO | Monitoreo Climático Inteligente_`;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: mensaje,\n    content_type: 'input_select',\n    content_attributes: {\n      items: [\n        { title: '🌦️ Ver pronóstico', value: 'pronostico' },\n        { title: '🌧️ Ver radar', value: 'radar' }\n      ]\n    }\n  }\n}];"
+        "jsCode": "\n/** \"¿A qué hora llueve?\": la próxima lluvia del pronóstico por horas (inicio, fin y mm) */\nfunction horaLluvia(data, lugar, usuarioId) {\n  const num = (v) => parseFloat(v) || 0;\n  const fmtMm = (mm) => (mm >= 1 ? String(Math.round(mm)) : (Math.round(mm * 10) / 10).toFixed(1));\n  const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];\n  const ahora = DateTime.now().setZone('America/La_Paz');\n  const horas = [];\n  for (const dia of data) {\n    for (const h of dia.horarios || []) {\n      const dt = DateTime.fromFormat(`${dia.fecha} ${String(h.h).slice(0, 5)}`, 'dd/MM/yyyy H:mm', { zone: 'America/La_Paz' });\n      if (!dt.isValid || dt < ahora.startOf('hour')) continue;\n      horas.push({ dt, mm: num(h.sr), paso: dia.granularidad_horas || 1 });\n    }\n  }\n  const radar = `🌐 Radar: https://iagro360.xyz/radar/${usuarioId}`;\n  const ini = horas.findIndex((x) => x.mm >= 0.3);\n  if (ini < 0) {\n    const dias = new Set(horas.map((x) => x.dt.toISODate())).size;\n    return `☀️ *Sin lluvia prevista en ${lugar}* en los próximos ${dias || 7} días.\\n\\n${radar}`;\n  }\n  // La lluvia sigue mientras haya agua, con pausas de hasta 2 h\n  let fin = ini;\n  for (let k = ini + 1; k < horas.length; k++) {\n    if (horas[k].dt.diff(horas[fin].dt, 'hours').hours > 3) break;\n    if (horas[k].mm > 0) fin = k;\n  }\n  const total = horas.slice(ini, fin + 1).reduce((s, x) => s + x.mm, 0);\n  const empieza = horas[ini].dt;\n  const termina = horas[fin].dt.plus({ hours: horas[fin].paso });\n  const diasSecos = Math.floor(empieza.startOf('day').diff(ahora.startOf('day'), 'days').days);\n  const dia = diasSecos === 0 ? 'Hoy' : diasSecos === 1 ? 'Mañana' : DIAS[empieza.weekday % 7];\n  let txt = `⏰ *Lluvia en ${lugar}*\\n🌧️ ${dia} ${empieza.toFormat('dd/LL')}\\n` +\n    `🕑 Empieza cerca de las *${empieza.toFormat('HH:mm')}*\\n🕖 Termina cerca de las *${termina.toFormat('HH:mm')}*\\n` +\n    `💧 Unos ${fmtMm(total)} mm en total`;\n  if (diasSecos >= 2) txt += `\\n\\n☀️ ${diasSecos} días secos antes. Buen momento para aplicar, temprano y con poco viento.`;\n  return `${txt}\\n\\n${radar}`;\n}\n\n// \"¿A qué hora llueve?\": respuesta corta con la hora de la próxima lluvia\nif ($('Adjuntar Datos de Usuario').first().json.intent === 'hora_lluvia') {\n  const u = $('Buscar Usuario por Teléfono').first().json;\n  return [{ json: {\n    conversation_id: $('Webhook').item.json.body.conversation.id,\n    content: horaLluvia($json.data || [], u.nombre_propiedad || 'tu lote', u.id),\n    content_type: 'input_select',\n    content_attributes: { items: [{ title: '🌦️ Pronóstico 7 días', value: 'pronostico' }, { title: '📤 Invitar amigos', value: 'invitar amigos' }] },\n  } }];\n}\n\nconst data = $json.data || [];\nconst usuario = $('Buscar Usuario por Teléfono').first().json;\nconst conversationId = $('Webhook').item.json.body.conversation.id;\n\n// ===== Ajustes =====\nconst MM_MINIMO = 1;        // menos de esto en el día NO se considera lluvia (para \"Próxima lluvia\")\nconst VIENTO_FUMIGAR = 20;  // km/h: desde aquí no se recomienda fumigar\nconst DIAS_LISTA = 8;       // cuántos días van en \"Próximos días\"\n\n// ===== Funciones auxiliares =====\nconst num = (v) => parseFloat(v);\n\nconst avgWind = (horarios) => {\n  const vals = horarios.map(h => num(h.vsd)).filter(v => !isNaN(v));\n  return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;\n};\n\nconst avgWindDir = (horarios) => {\n  const dirs = horarios.map(h => h.vdId).filter(Boolean);\n  if (!dirs.length) return '';\n  const freq = {};\n  dirs.forEach(d => freq[d] = (freq[d] || 0) + 1);\n  return Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];\n};\n\nconst temps = (horarios) => horarios.map(h => num(h.td)).filter(v => !isNaN(v));\nconst maxTemp = (horarios) => { const t = temps(horarios); return t.length ? Math.round(Math.max(...t)) : '-'; };\nconst minTemp = (horarios) => { const t = temps(horarios); return t.length ? Math.round(Math.min(...t)) : '-'; };\n\nconst totalMm = (horarios) => horarios.reduce((s, h) => s + (num(h.sr) || 0), 0);\n\n// Formato de mm: entero si es grande, 1 decimal si es poco\nconst fmtMm = (mm) => mm >= 1 ? String(Math.round(mm)) : (Math.round(mm * 10) / 10).toFixed(1);\n\nconst parseFecha = (fecha) => {\n  const [dia, mes, anio] = fecha.split('/');\n  return new Date(anio, mes - 1, dia, 12); // evita errores de zona horaria\n};\nconst nombreLargo = (f) => ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][parseFecha(f).getDay()];\nconst nombreCorto = (f) => ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][parseFecha(f).getDay()];\nconst ddmm = (f) => f.slice(0, 5); // \"06/10/2026\" -> \"06/10\"\n\n// ===== Procesar días (hoy + DIAS_LISTA días siguientes) =====\nconst dias = data.slice(0, 1 + DIAS_LISTA).map(dia => {\n  const horarios = dia.horarios || [];\n  const mm = totalMm(horarios);\n  const horasLluvia = horarios.filter(h => num(h.sr) > 0);\n  // Hora de inicio: primera hora con lluvia\n  const primera = horasLluvia[0];\n  // Probabilidad: la máxima de las horas con lluvia\n  const prob = horasLluvia.length ? Math.max(...horasLluvia.map(h => num(h.rp) || 0)) : 0;\n  return {\n    fecha: dia.fecha,\n    minT: minTemp(horarios),\n    maxT: maxTemp(horarios),\n    viento: avgWind(horarios),\n    dir: avgWindDir(horarios),\n    mm,\n    llueve: mm >= MM_MINIMO,\n    lluviaLigera: mm > 0 && mm < MM_MINIMO,\n    horaInicio: primera ? primera.h : null,\n    prob,\n  };\n});\n\n// ===== Armar mensaje =====\nlet mensaje = `🌦️ **${usuario.nombre_propiedad}**\\n`;\n\nif (dias.length) {\n  const hoy = dias[0];\n\n  // HOY\n  mensaje += `\\n📍 *Hoy ${nombreLargo(hoy.fecha)} ${ddmm(hoy.fecha)}*\\n`;\n  mensaje += `🌡️ ${hoy.minT}° / ${hoy.maxT}°C  ·  💨 ${hoy.viento} km/h ${hoy.dir}\\n`;\n\n  // PRÓXIMA LLUVIA (depende del umbral MM_MINIMO)\n  const proxima = dias.find(d => d.llueve);\n  if (proxima) {\n    const cuando = proxima === hoy\n      ? 'hoy'\n      : `${nombreLargo(proxima.fecha)} ${ddmm(proxima.fecha)}`;\n    mensaje += `\\n🌧️ *Próxima lluvia:* ${cuando} desde las ${proxima.horaInicio}\\n`;\n    mensaje += `Se esperan unos ${Math.round(proxima.mm)} mm (probabilidad ${proxima.prob}%)\\n`;\n  } else {\n    mensaje += `\\n☀️ *Sin lluvias importantes en los próximos días*\\n`;\n  }\n\n  // PRÓXIMOS DÍAS (una línea por día)\n  mensaje += `\\n📅 *Próximos días*\\n`;\n  for (const d of dias.slice(1, 1 + DIAS_LISTA)) {\n    let icono, extra;\n    if (d.llueve) {\n      icono = '🌧️';\n      extra = `💧 ${fmtMm(d.mm)} mm`;\n    } else if (d.lluviaLigera) {\n      icono = '🌦️';\n      extra = `💧 ${fmtMm(d.mm)} mm`;\n    } else {\n      icono = '☀️';\n      extra = `💨 ${d.viento}`;\n    }\n    mensaje += `${nombreCorto(d.fecha)} ${ddmm(d.fecha)} ${icono} ${d.minT}°–${d.maxT}° ${extra}\\n`;\n  }\n\n  // RECOMENDACIÓN\n  const proximos3 = dias.slice(0, 3);\n  const ventosos = proximos3.filter(d => d.viento >= VIENTO_FUMIGAR).length;\n  const calorExtremo = proximos3.some(d => d.maxT !== '-' && d.maxT > 35);\n  const frio = proximos3.some(d => d.minT !== '-' && d.minT < 16);\n\n  const avisos = [];\n  if (proxima && proxima !== hoy) {\n    const diasSecos = dias.indexOf(proxima);\n    if (diasSecos >= 2) avisos.push(`${diasSecos} días secos antes de la lluvia`);\n  }\n  if (ventosos >= 2) avisos.push('⚠️ viento fuerte, no recomendable fumigar');\n  else if (!proxima || proxima !== hoy) avisos.push('✅ buen momento para aplicaciones en días de poco viento');\n  if (calorExtremo) avisos.push('🌡️ calor extremo');\n  if (frio) avisos.push('🥶 temperaturas frías');\n\n  if (avisos.length) mensaje += `\\n💡 *Resumen:* ${avisos.join(' · ')}\\n`;\n}\n\nmensaje += `\\n🌐 Radar en vivo: https://iagro360.xyz/radar/${usuario.id}\\n`;\nmensaje += `\\n📡 _IAGRO | Monitoreo Climático Inteligente_`;\n\nreturn [{\n  json: {\n    conversation_id: conversationId,\n    content: mensaje,\n    content_type: 'input_select',\n    content_attributes: {\n      items: [\n        { title: '🌦️ Ver pronóstico', value: 'pronostico' },\n        { title: '🌧️ Ver radar', value: 'radar' }\n      ]\n    }\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1605,6 +1627,408 @@
       ],
       "id": "e46f09fe-d640-40e1-8c5b-d2dcc5639754",
       "name": "Preparar Mensajes Feria1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Registro por WhatsApp: decide el siguiente paso según lo que mandó el contacto\n// accion: responder (pregunta + guarda el paso) | geocodificar (busca el lugar escrito) | registrar | invitar\nconst ctx = $json;\nconst webhook = $('Webhook').first().json.body;\nconst CIUDADES = {\"Santa Cruz\": [[\"Santa Cruz de la Sierra\", -17.786, -63.181], [\"Montero\", -17.339, -63.251], [\"Warnes\", -17.516, -63.168], [\"San Julián\", -16.9065, -62.6189], [\"Cuatro Cañadas\", -17.4333, -62.3333], [\"Pailón\", -17.659, -62.7197], [\"Yapacaní\", -17.4, -63.8333], [\"San Ignacio de Velasco\", -16.378, -60.965], [\"Camiri\", -20.041, -63.524]], \"Beni\": [[\"Trinidad\", -14.832, -64.903], [\"Riberalta\", -11.01, -66.053], [\"Guayaramerín\", -10.826, -65.358], [\"San Borja\", -14.852, -66.75], [\"Rurrenabaque\", -14.441, -67.528], [\"Santa Ana del Yacuma\", -13.744, -65.427], [\"San Ignacio de Moxos\", -14.995, -65.64], [\"Reyes\", -14.295, -67.336], [\"Magdalena\", -13.259, -64.053]], \"Cochabamba\": [[\"Cochabamba\", -17.382, -66.16], [\"Quillacollo\", -17.392, -66.278], [\"Sacaba\", -17.398, -66.038], [\"Punata\", -17.542, -65.835], [\"Villa Tunari\", -16.974, -65.421], [\"Chimoré\", -16.994, -65.153], [\"Ivirgarzama\", -17.038, -64.861], [\"Shinahota\", -16.985, -65.265], [\"Aiquile\", -18.204, -65.181]], \"La Paz\": [[\"La Paz\", -16.5, -68.15], [\"El Alto\", -16.504, -68.161], [\"Caranavi\", -15.834, -67.566], [\"Palos Blancos\", -15.587, -67.25], [\"Coroico\", -16.194, -67.73], [\"Achacachi\", -16.047, -68.685], [\"Viacha\", -16.65, -68.3], [\"Patacamaya\", -17.236, -67.914], [\"Copacabana\", -16.17, -69.079]], \"Tarija\": [[\"Tarija\", -21.535, -64.73], [\"Yacuiba\", -22.016, -63.678], [\"Bermejo\", -22.732, -64.337], [\"Villamontes\", -21.262, -63.469], [\"Entre Ríos\", -21.527, -64.173], [\"Padcaya\", -21.887, -64.713], [\"Uriondo\", -21.697, -64.656], [\"Caraparí\", -21.828, -63.743], [\"San Lorenzo\", -21.418, -64.75]], \"Chuquisaca\": [[\"Sucre\", -19.033, -65.263], [\"Monteagudo\", -19.8, -63.956], [\"Muyupampa\", -19.895, -63.751], [\"Camargo\", -20.641, -65.209], [\"Padilla\", -19.309, -64.303], [\"Villa Serrano\", -19.125, -64.323], [\"Tarabuco\", -19.182, -64.915], [\"Culpina\", -20.824, -64.945], [\"Zudáñez\", -19.118, -64.703]], \"Pando\": [[\"Cobija\", -11.027, -68.769], [\"Porvenir\", -9.983, -66.733], [\"Filadelfia\", -11.347, -68.758], [\"Puerto Rico\", -11.106, -67.552], [\"Bella Flor\", -11.142, -67.82], [\"Gonzalo Moreno\", -11.038, -66.134]], \"Potosí\": [[\"Potosí\", -19.584, -65.753], [\"Uyuni\", -20.46, -66.825], [\"Tupiza\", -21.443, -65.719], [\"Villazón\", -22.087, -65.594], [\"Llallagua\", -18.425, -66.578], [\"Betanzos\", -19.553, -65.454], [\"Cotagaita\", -20.817, -65.667], [\"Puna\", -19.795, -65.506], [\"Colquechaca\", -18.7, -66.004]], \"Oruro\": [[\"Oruro\", -17.972, -67.093], [\"Challapata\", -18.902, -66.77], [\"Huanuni\", -18.289, -66.836], [\"Caracollo\", -17.639, -67.219], [\"Huari\", -19.013, -66.777], [\"Eucaliptus\", -17.583, -67.517], [\"Toledo\", -18.181, -67.407], [\"Curahuara de Carangas\", -17.843, -68.409], [\"Salinas de G. Mendoza\", -19.637, -67.675]]};\nconst norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/^[^a-z0-9]+/, '').trim();\nconst nombreContacto = ctx.contact_name && ctx.contact_name !== 'Cliente' ? ctx.contact_name : null;\nconst base = {\n  conversation_id: webhook.conversation.id, telefono: ctx.telefono,\n  chatwoot_contact_id: webhook.conversation?.meta?.sender?.id ?? null,\n  pedido: ctx.reg_pedido || 'fc', nombre: nombreContacto, codigo_invitado: ctx.codigo_invitado || null,\n};\nconst salida = (accion, extra) => [{ json: { ...base, accion, ...extra } }];\nconst responder = (content, items, guardar) => salida('responder', {\n  content, ...(items ? { content_type: 'input_select', content_attributes: { items } } : {}), guardar,\n});\nconst pedirDepartamento = (prefijo = '') => responder(`${prefijo}Elige tu departamento 👇`,\n  Object.keys(CIUDADES).map((d) => ({ title: d, value: d })), { estado: 'ESPERANDO_DEPARTAMENTO' });\nconst km = (a, b) => {\n  const r = Math.PI / 180, dLat = (b[0] - a[0]) * r, dLon = (b[1] - a[1]) * r;\n  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLon / 2) ** 2;\n  return 12742 * Math.asin(Math.sqrt(x));\n};\n\n// 📤 Invitar amigos\nif (ctx.intent === 'invitar') {\n  if (ctx.usuario?.id) return salida('invitar', { usuario_id: ctx.usuario.id });\n  base.pedido = 'fc';\n}\n\n// 1) Pide la ubicación (un solo mensaje, con el botón de la lista)\nif (ctx.intent === 'reg_inicio' || ctx.intent === 'invitar') {\n  const para = base.pedido === 'hora' ? 'a qué hora llueve' : 'el pronóstico de 7 días';\n  return responder(\n    `🌾 Para decirte ${para} *en tu lote* necesito saber dónde está. Lo haces una sola vez.\\n\\n` +\n    `📍 Envíame tu ubicación: toca 📎 → *Ubicación* → *Enviar tu ubicación actual*\\n` +\n    `✍️ o escríbeme el nombre de tu ciudad o comunidad`,\n    [{ title: '🏙️ Elegir de una lista', value: 'elegir de una lista' }],\n    { estado: 'ESPERANDO_UBICACION' });\n}\n\n// 2) Ubicación con el 📎: se nombra con la ciudad más cercana de la lista\nif (ctx.intent === 'reg_ubicacion') {\n  const lat = Number(ctx.ubicacion.lat), lon = Number(ctx.ubicacion.lon);\n  let cerca = null;\n  for (const [depto, lista] of Object.entries(CIUDADES)) {\n    for (const [c, la, lo] of lista) {\n      const dist = km([lat, lon], [la, lo]);\n      if (!cerca || dist < cerca.dist) cerca = { nombre: c, depto, dist };\n    }\n  }\n  const zona = cerca && cerca.dist <= 40 ? `${cerca.nombre}, ${cerca.depto}` : null;\n  return salida('registrar', { reg: { lat, lon, zona, origen: 'pin' } });\n}\n\n// 3) Respuesta de texto o de lista\nconst txt = norm(ctx.texto_original);\nconst estado = ctx.chat?.estado;\nif (/^(elegir de una lista|lista|elegir|ninguno|ninguna)$/.test(txt)) return pedirDepartamento();\n\nconst depto = Object.keys(CIUDADES).find((d) => norm(d) === txt);\nif (depto) {\n  return responder('Elige la ciudad más cercana a tu lote:', CIUDADES[depto].map(([c]) => ({ title: c, value: c })),\n    { estado: 'ESPERANDO_CIUDAD', departamento: depto });\n}\n\nif (estado === 'ELEGIR_LUGAR') {\n  const op = (ctx.chat.opciones || []).find((o) => norm(o.titulo) === txt || norm(o.nombre) === txt);\n  if (op) return salida('registrar', { reg: { lat: op.lat, lon: op.lon, zona: `${op.nombre}, ${op.depto}`, origen: 'geocoding' } });\n}\n\n// Ciudad de la lista (si esperaba ciudad, primero la del departamento elegido)\nconst orden = estado === 'ESPERANDO_CIUDAD' && ctx.chat.departamento ? [ctx.chat.departamento] : Object.keys(CIUDADES);\nfor (const d of orden) {\n  const c = (CIUDADES[d] || []).find(([n]) => norm(n) === txt);\n  if (c) return salida('registrar', { reg: { lat: c[1], lon: c[2], zona: `${c[0]}, ${d}`, origen: 'geocoding' } });\n}\n\nif (txt.length < 3) return pedirDepartamento('No encontré ese lugar. ');\n// Texto libre: se busca el lugar en Bolivia\nreturn salida('geocodificar', { q: String(ctx.texto_original || '').trim().slice(0, 60) });\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        3500
+      ],
+      "id": "406f0e91-a3be-460d-b7a8-0c1d0274cc25",
+      "name": "Registro: Decidir"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "reg-responder",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "responder",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "responder"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "reg-geocodificar",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "geocodificar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "geocodificar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "reg-registrar",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "registrar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "registrar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "reg-invitar",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "invitar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "invitar"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2112,
+        3500
+      ],
+      "id": "16ce977b-4042-410d-b4d9-3347b79c5303",
+      "name": "Registro: Acción"
+    },
+    {
+      "parameters": {
+        "url": "=https://geocoding-api.open-meteo.com/v1/search?name={{ encodeURIComponent($json.q) }}&count=10&language=es&format=json&countryCode=BO",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2352,
+        3660
+      ],
+      "id": "9a623c15-eab1-4681-a968-ee362f80c335",
+      "name": "Registro: Buscar Lugar",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== Común del registro por WhatsApp =====\nconst CIUDADES = {\"Santa Cruz\": [[\"Santa Cruz de la Sierra\", -17.786, -63.181], [\"Montero\", -17.339, -63.251], [\"Warnes\", -17.516, -63.168], [\"San Julián\", -16.9065, -62.6189], [\"Cuatro Cañadas\", -17.4333, -62.3333], [\"Pailón\", -17.659, -62.7197], [\"Yapacaní\", -17.4, -63.8333], [\"San Ignacio de Velasco\", -16.378, -60.965], [\"Camiri\", -20.041, -63.524]], \"Beni\": [[\"Trinidad\", -14.832, -64.903], [\"Riberalta\", -11.01, -66.053], [\"Guayaramerín\", -10.826, -65.358], [\"San Borja\", -14.852, -66.75], [\"Rurrenabaque\", -14.441, -67.528], [\"Santa Ana del Yacuma\", -13.744, -65.427], [\"San Ignacio de Moxos\", -14.995, -65.64], [\"Reyes\", -14.295, -67.336], [\"Magdalena\", -13.259, -64.053]], \"Cochabamba\": [[\"Cochabamba\", -17.382, -66.16], [\"Quillacollo\", -17.392, -66.278], [\"Sacaba\", -17.398, -66.038], [\"Punata\", -17.542, -65.835], [\"Villa Tunari\", -16.974, -65.421], [\"Chimoré\", -16.994, -65.153], [\"Ivirgarzama\", -17.038, -64.861], [\"Shinahota\", -16.985, -65.265], [\"Aiquile\", -18.204, -65.181]], \"La Paz\": [[\"La Paz\", -16.5, -68.15], [\"El Alto\", -16.504, -68.161], [\"Caranavi\", -15.834, -67.566], [\"Palos Blancos\", -15.587, -67.25], [\"Coroico\", -16.194, -67.73], [\"Achacachi\", -16.047, -68.685], [\"Viacha\", -16.65, -68.3], [\"Patacamaya\", -17.236, -67.914], [\"Copacabana\", -16.17, -69.079]], \"Tarija\": [[\"Tarija\", -21.535, -64.73], [\"Yacuiba\", -22.016, -63.678], [\"Bermejo\", -22.732, -64.337], [\"Villamontes\", -21.262, -63.469], [\"Entre Ríos\", -21.527, -64.173], [\"Padcaya\", -21.887, -64.713], [\"Uriondo\", -21.697, -64.656], [\"Caraparí\", -21.828, -63.743], [\"San Lorenzo\", -21.418, -64.75]], \"Chuquisaca\": [[\"Sucre\", -19.033, -65.263], [\"Monteagudo\", -19.8, -63.956], [\"Muyupampa\", -19.895, -63.751], [\"Camargo\", -20.641, -65.209], [\"Padilla\", -19.309, -64.303], [\"Villa Serrano\", -19.125, -64.323], [\"Tarabuco\", -19.182, -64.915], [\"Culpina\", -20.824, -64.945], [\"Zudáñez\", -19.118, -64.703]], \"Pando\": [[\"Cobija\", -11.027, -68.769], [\"Porvenir\", -9.983, -66.733], [\"Filadelfia\", -11.347, -68.758], [\"Puerto Rico\", -11.106, -67.552], [\"Bella Flor\", -11.142, -67.82], [\"Gonzalo Moreno\", -11.038, -66.134]], \"Potosí\": [[\"Potosí\", -19.584, -65.753], [\"Uyuni\", -20.46, -66.825], [\"Tupiza\", -21.443, -65.719], [\"Villazón\", -22.087, -65.594], [\"Llallagua\", -18.425, -66.578], [\"Betanzos\", -19.553, -65.454], [\"Cotagaita\", -20.817, -65.667], [\"Puna\", -19.795, -65.506], [\"Colquechaca\", -18.7, -66.004]], \"Oruro\": [[\"Oruro\", -17.972, -67.093], [\"Challapata\", -18.902, -66.77], [\"Huanuni\", -18.289, -66.836], [\"Caracollo\", -17.639, -67.219], [\"Huari\", -19.013, -66.777], [\"Eucaliptus\", -17.583, -67.517], [\"Toledo\", -18.181, -67.407], [\"Curahuara de Carangas\", -17.843, -68.409], [\"Salinas de G. Mendoza\", -19.637, -67.675]]};   // [nombre, lat, lon] por departamento (lista del prototipo)\nconst DEPTO_CORTO = { 'Santa Cruz': 'SCZ', 'Beni': 'Beni', 'Cochabamba': 'CBBA', 'La Paz': 'LPZ', 'Tarija': 'TJA',\n  'Chuquisaca': 'CHQ', 'Pando': 'Pando', 'Potosí': 'PTS', 'Oruro': 'Oruro' };\nconst norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/^[^a-z0-9]+/, '').trim();\nconst ctxReg = $('Registro: Decidir').first().json;\nconst base = {\n  conversation_id: ctxReg.conversation_id, telefono: ctxReg.telefono, chatwoot_contact_id: ctxReg.chatwoot_contact_id,\n  pedido: ctxReg.pedido, nombre: ctxReg.nombre, codigo_invitado: ctxReg.codigo_invitado,\n};\nconst salida = (accion, extra) => [{ json: { ...base, accion, ...extra } }];\nconst responder = (content, items, guardar) => salida('responder', {\n  content, ...(items ? { content_type: 'input_select', content_attributes: { items } } : {}), guardar,\n});\nconst pedirDepartamento = (prefijo = '') => responder(`${prefijo}Elige tu departamento 👇`,\n  Object.keys(CIUDADES).map((d) => ({ title: d, value: d })), { estado: 'ESPERANDO_DEPARTAMENTO' });\n\n// Resultado del buscador de lugares (Open-Meteo, solo Bolivia): uno → registra; varios → pregunta; ninguno → lista\nconst q = ctxReg.q;\nconst limpiarDepto = (a) => String(a || '').replace(/^Departamento (de |del )?/i, '').trim();\nconst vistos = new Set();\nconst lugares = [];\nfor (const r of $json.results || []) {\n  if (r.country_code && r.country_code !== 'BO') continue;\n  const depto = limpiarDepto(r.admin1);\n  const k = `${norm(r.name)}|${norm(depto)}`;\n  if (vistos.has(k)) continue;\n  vistos.add(k);\n  lugares.push({ nombre: r.name, depto, lat: Number(r.latitude), lon: Number(r.longitude) });\n}\nif (!lugares.length) return pedirDepartamento(`No encontré *${q}*. `);\nif (lugares.length === 1) {\n  const l = lugares[0];\n  return salida('registrar', { reg: { lat: l.lat, lon: l.lon, zona: `${l.nombre}${l.depto ? `, ${l.depto}` : ''}`, origen: 'geocoding' } });\n}\n// Varios: hasta 2 como botones (+ Ninguno) o hasta 9 en lista (+ Ninguno)\nconst max = lugares.length <= 2 ? 2 : 9;\nconst largo = max === 2 ? 20 : 24;   // límites de WhatsApp para títulos de botón / fila de lista\nconst opciones = lugares.slice(0, max).map((l) => {\n  let titulo = `${l.nombre} (${DEPTO_CORTO[l.depto] || l.depto})`;\n  if (titulo.length > largo) titulo = `${l.nombre.slice(0, largo - (DEPTO_CORTO[l.depto] || l.depto).length - 4)}… (${DEPTO_CORTO[l.depto] || l.depto})`;\n  return { ...l, titulo };\n});\nreturn responder(`Encontré varios lugares llamados *${lugares[0].nombre}*. ¿Cuál es el tuyo?`,\n  [...opciones.map((o) => ({ title: o.titulo, value: o.titulo })), { title: 'Ninguno', value: 'ninguno' }],\n  { estado: 'ELEGIR_LUGAR', opciones });\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2592,
+        3660
+      ],
+      "id": "e082e528-92a2-48d6-8a5c-42150a27456f",
+      "name": "Registro: Elegir Lugar"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "reg-si",
+              "leftValue": "={{ $json.accion }}",
+              "rightValue": "registrar",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2832,
+        3660
+      ],
+      "id": "5ea8fb5d-a6b6-44aa-8abb-aac8a2367a19",
+      "name": "Registro: ¿Registrar?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.registro_chat_guardar($1, $2, $3, NULLIF($4, ''), NULLIF($5, '')::jsonb, NULLIF($6, ''))",
+        "options": {
+          "queryReplacement": "={{ [ $json.telefono, $json.guardar.estado, $json.pedido, $json.guardar.departamento || '', $json.guardar.opciones ? JSON.stringify($json.guardar.opciones) : '', $json.codigo_invitado || '' ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3072,
+        3900
+      ],
+      "id": "f281c170-33fc-492e-aa1e-7fa6d35f6999",
+      "name": "Registro: Guardar Paso",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.registrar_desde_chat($1, NULLIF($2, ''), $3::double precision, $4::double precision, NULLIF($5, ''), $6, NULLIF($7, '')::bigint) AS r",
+        "options": {
+          "queryReplacement": "={{ [ $json.telefono, $json.nombre || '', $json.reg.lat, $json.reg.lon, $json.reg.zona || '', $json.reg.origen, $json.chatwoot_contact_id ? String($json.chatwoot_contact_id) : '' ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3072,
+        3500
+      ],
+      "id": "0b7f2de1-22ed-4036-8553-048e19f7d9bb",
+      "name": "Registro: Alta",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Configuración Global').first().json.weather_api_url }}/forecast/hourly?lat={{ $json.r.latitud }}&lon={{ $json.r.longitud }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3312,
+        3500
+      ],
+      "id": "1718b58b-4850-455e-9943-e261f8efd010",
+      "name": "Registro: Clima",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "/** \"¿A qué hora llueve?\": la próxima lluvia del pronóstico por horas (inicio, fin y mm) */\nfunction horaLluvia(data, lugar, usuarioId) {\n  const num = (v) => parseFloat(v) || 0;\n  const fmtMm = (mm) => (mm >= 1 ? String(Math.round(mm)) : (Math.round(mm * 10) / 10).toFixed(1));\n  const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];\n  const ahora = DateTime.now().setZone('America/La_Paz');\n  const horas = [];\n  for (const dia of data) {\n    for (const h of dia.horarios || []) {\n      const dt = DateTime.fromFormat(`${dia.fecha} ${String(h.h).slice(0, 5)}`, 'dd/MM/yyyy H:mm', { zone: 'America/La_Paz' });\n      if (!dt.isValid || dt < ahora.startOf('hour')) continue;\n      horas.push({ dt, mm: num(h.sr), paso: dia.granularidad_horas || 1 });\n    }\n  }\n  const radar = `🌐 Radar: https://iagro360.xyz/radar/${usuarioId}`;\n  const ini = horas.findIndex((x) => x.mm >= 0.3);\n  if (ini < 0) {\n    const dias = new Set(horas.map((x) => x.dt.toISODate())).size;\n    return `☀️ *Sin lluvia prevista en ${lugar}* en los próximos ${dias || 7} días.\\n\\n${radar}`;\n  }\n  // La lluvia sigue mientras haya agua, con pausas de hasta 2 h\n  let fin = ini;\n  for (let k = ini + 1; k < horas.length; k++) {\n    if (horas[k].dt.diff(horas[fin].dt, 'hours').hours > 3) break;\n    if (horas[k].mm > 0) fin = k;\n  }\n  const total = horas.slice(ini, fin + 1).reduce((s, x) => s + x.mm, 0);\n  const empieza = horas[ini].dt;\n  const termina = horas[fin].dt.plus({ hours: horas[fin].paso });\n  const diasSecos = Math.floor(empieza.startOf('day').diff(ahora.startOf('day'), 'days').days);\n  const dia = diasSecos === 0 ? 'Hoy' : diasSecos === 1 ? 'Mañana' : DIAS[empieza.weekday % 7];\n  let txt = `⏰ *Lluvia en ${lugar}*\\n🌧️ ${dia} ${empieza.toFormat('dd/LL')}\\n` +\n    `🕑 Empieza cerca de las *${empieza.toFormat('HH:mm')}*\\n🕖 Termina cerca de las *${termina.toFormat('HH:mm')}*\\n` +\n    `💧 Unos ${fmtMm(total)} mm en total`;\n  if (diasSecos >= 2) txt += `\\n\\n☀️ ${diasSecos} días secos antes. Buen momento para aplicar, temprano y con poco viento.`;\n  return `${txt}\\n\\n${radar}`;\n}\n\n/** Texto del pronóstico de 7 días (el mismo de \"Formatear Pronóstico + Radar\") */\nfunction pronosticoTexto(data, usuario) {\n// ===== Ajustes =====\nconst MM_MINIMO = 1;        // menos de esto en el día NO se considera lluvia (para \"Próxima lluvia\")\nconst VIENTO_FUMIGAR = 20;  // km/h: desde aquí no se recomienda fumigar\nconst DIAS_LISTA = 8;       // cuántos días van en \"Próximos días\"\n\n// ===== Funciones auxiliares =====\nconst num = (v) => parseFloat(v);\n\nconst avgWind = (horarios) => {\n  const vals = horarios.map(h => num(h.vsd)).filter(v => !isNaN(v));\n  return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;\n};\n\nconst avgWindDir = (horarios) => {\n  const dirs = horarios.map(h => h.vdId).filter(Boolean);\n  if (!dirs.length) return '';\n  const freq = {};\n  dirs.forEach(d => freq[d] = (freq[d] || 0) + 1);\n  return Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];\n};\n\nconst temps = (horarios) => horarios.map(h => num(h.td)).filter(v => !isNaN(v));\nconst maxTemp = (horarios) => { const t = temps(horarios); return t.length ? Math.round(Math.max(...t)) : '-'; };\nconst minTemp = (horarios) => { const t = temps(horarios); return t.length ? Math.round(Math.min(...t)) : '-'; };\n\nconst totalMm = (horarios) => horarios.reduce((s, h) => s + (num(h.sr) || 0), 0);\n\n// Formato de mm: entero si es grande, 1 decimal si es poco\nconst fmtMm = (mm) => mm >= 1 ? String(Math.round(mm)) : (Math.round(mm * 10) / 10).toFixed(1);\n\nconst parseFecha = (fecha) => {\n  const [dia, mes, anio] = fecha.split('/');\n  return new Date(anio, mes - 1, dia, 12); // evita errores de zona horaria\n};\nconst nombreLargo = (f) => ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][parseFecha(f).getDay()];\nconst nombreCorto = (f) => ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][parseFecha(f).getDay()];\nconst ddmm = (f) => f.slice(0, 5); // \"06/10/2026\" -> \"06/10\"\n\n// ===== Procesar días (hoy + DIAS_LISTA días siguientes) =====\nconst dias = data.slice(0, 1 + DIAS_LISTA).map(dia => {\n  const horarios = dia.horarios || [];\n  const mm = totalMm(horarios);\n  const horasLluvia = horarios.filter(h => num(h.sr) > 0);\n  // Hora de inicio: primera hora con lluvia\n  const primera = horasLluvia[0];\n  // Probabilidad: la máxima de las horas con lluvia\n  const prob = horasLluvia.length ? Math.max(...horasLluvia.map(h => num(h.rp) || 0)) : 0;\n  return {\n    fecha: dia.fecha,\n    minT: minTemp(horarios),\n    maxT: maxTemp(horarios),\n    viento: avgWind(horarios),\n    dir: avgWindDir(horarios),\n    mm,\n    llueve: mm >= MM_MINIMO,\n    lluviaLigera: mm > 0 && mm < MM_MINIMO,\n    horaInicio: primera ? primera.h : null,\n    prob,\n  };\n});\n\n// ===== Armar mensaje =====\nlet mensaje = `🌦️ **${usuario.nombre_propiedad}**\\n`;\n\nif (dias.length) {\n  const hoy = dias[0];\n\n  // HOY\n  mensaje += `\\n📍 *Hoy ${nombreLargo(hoy.fecha)} ${ddmm(hoy.fecha)}*\\n`;\n  mensaje += `🌡️ ${hoy.minT}° / ${hoy.maxT}°C  ·  💨 ${hoy.viento} km/h ${hoy.dir}\\n`;\n\n  // PRÓXIMA LLUVIA (depende del umbral MM_MINIMO)\n  const proxima = dias.find(d => d.llueve);\n  if (proxima) {\n    const cuando = proxima === hoy\n      ? 'hoy'\n      : `${nombreLargo(proxima.fecha)} ${ddmm(proxima.fecha)}`;\n    mensaje += `\\n🌧️ *Próxima lluvia:* ${cuando} desde las ${proxima.horaInicio}\\n`;\n    mensaje += `Se esperan unos ${Math.round(proxima.mm)} mm (probabilidad ${proxima.prob}%)\\n`;\n  } else {\n    mensaje += `\\n☀️ *Sin lluvias importantes en los próximos días*\\n`;\n  }\n\n  // PRÓXIMOS DÍAS (una línea por día)\n  mensaje += `\\n📅 *Próximos días*\\n`;\n  for (const d of dias.slice(1, 1 + DIAS_LISTA)) {\n    let icono, extra;\n    if (d.llueve) {\n      icono = '🌧️';\n      extra = `💧 ${fmtMm(d.mm)} mm`;\n    } else if (d.lluviaLigera) {\n      icono = '🌦️';\n      extra = `💧 ${fmtMm(d.mm)} mm`;\n    } else {\n      icono = '☀️';\n      extra = `💨 ${d.viento}`;\n    }\n    mensaje += `${nombreCorto(d.fecha)} ${ddmm(d.fecha)} ${icono} ${d.minT}°–${d.maxT}° ${extra}\\n`;\n  }\n\n  // RECOMENDACIÓN\n  const proximos3 = dias.slice(0, 3);\n  const ventosos = proximos3.filter(d => d.viento >= VIENTO_FUMIGAR).length;\n  const calorExtremo = proximos3.some(d => d.maxT !== '-' && d.maxT > 35);\n  const frio = proximos3.some(d => d.minT !== '-' && d.minT < 16);\n\n  const avisos = [];\n  if (proxima && proxima !== hoy) {\n    const diasSecos = dias.indexOf(proxima);\n    if (diasSecos >= 2) avisos.push(`${diasSecos} días secos antes de la lluvia`);\n  }\n  if (ventosos >= 2) avisos.push('⚠️ viento fuerte, no recomendable fumigar');\n  else if (!proxima || proxima !== hoy) avisos.push('✅ buen momento para aplicaciones en días de poco viento');\n  if (calorExtremo) avisos.push('🌡️ calor extremo');\n  if (frio) avisos.push('🥶 temperaturas frías');\n\n  if (avisos.length) mensaje += `\\n💡 *Resumen:* ${avisos.join(' · ')}\\n`;\n}\n\nmensaje += `\\n🌐 Radar en vivo: https://iagro360.xyz/radar/${usuario.id}\\n`;\nmensaje += `\\n📡 _IAGRO | Monitoreo Climático Inteligente_`;\n\n  return mensaje;\n}\n\n// Confirmación + lo que pidió (pronóstico 7 días u hora de la lluvia) + invitación\nconst d = $('Registro: Decidir').first().json;\nconst r = $('Registro: Alta').first().json.r || {};\nconst data = $json.data || [];\nconst lugar = r.zona || (r.latitud != null ? `${Number(r.latitud).toFixed(4)}, ${Number(r.longitud).toFixed(4)}` : 'tu zona');\nconst titulo = r.es_nuevo ? `✅ *Lote registrado en ${lugar}*` : `📍 *Ubicación de tu lote actualizada:* ${lugar}`;\n\nlet cuerpo;\nif (!data.length) cuerpo = '⚠️ No pude obtener el pronóstico en este momento. Escríbeme *pronóstico* en unos minutos. 🙏';\nelse if (d.pedido === 'hora') cuerpo = horaLluvia(data, (r.zona || 'tu lote').split(',')[0], r.usuario_id);\nelse cuerpo = pronosticoTexto(data, { id: r.usuario_id, nombre_propiedad: r.nombre || (r.zona || 'Tu lote').split(',')[0].toUpperCase() });\n\nconst premio = Number(r.premio_dias) === 30 ? '1 mes gratis' : `${r.premio_dias} días gratis`;\nconst pie = `🎁 Invita ${r.meta} amigos = ${premio} para tu lote · ${r.amigos} de ${r.meta}`;\nconst content = `${titulo}\\n\\n${cuerpo}\\n📍 ¿No es tu lote? Envíame tu ubicación con el 📎 cuando quieras.\\n\\n${pie}`;\n\n// WhatsApp no acepta botones si el texto supera 1024 caracteres\nreturn [{ json: {\n  conversation_id: d.conversation_id, content,\n  ...(content.length <= 1000 ? { content_type: 'input_select', content_attributes: { items: [{ title: '📤 Invitar amigos', value: 'invitar amigos' }] } } : {}),\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3552,
+        3500
+      ],
+      "id": "0cb9d5a5-503c-4ff7-9d2c-f6034622e126",
+      "name": "Registro: Respuesta"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.datos_invitacion($1::bigint) AS i",
+        "options": {
+          "queryReplacement": "={{ [ $json.usuario_id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2352,
+        4140
+      ],
+      "id": "78744d28-d668-4d70-ba74-484d139ab553",
+      "name": "Invitación: Datos",
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://iagro360.xyz/img/invitacion.jpg",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2592,
+        4140
+      ],
+      "id": "b228173f-dbf4-44c4-85d7-944fa1f917d7",
+      "name": "Invitación: Imagen",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Imagen con su enlace de invitación: el cliente la reenvía con la flecha ↪ (el reenvío no le cuesta a IAgro)\nconst item = $input.first();\nconst i = $('Invitación: Datos').first().json.i || {};\nconst enlace = `https://wa.me/${i.whatsapp}?text=${encodeURIComponent(`Quiero alertas IAgro ${i.codigo}`)}`;\nif (item.binary && item.binary.data) {\n  item.binary.data.fileName = 'invitacion.jpg';\n  item.binary.data.fileExtension = 'jpg';\n  item.binary.data.mimeType = 'image/jpeg';\n}\nitem.json = {\n  conversation_id: $('Registro: Decidir').first().json.conversation_id,\n  caption: `🌧️ Yo recibo los avisos de lluvia de *IAgro* por WhatsApp: pronóstico de 7 días y a qué hora llueve en mi zona. ¡Es gratis!\\n\\nSuscríbete aquí 👉 ${enlace}`,\n};\nreturn [item];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2832,
+        4140
+      ],
+      "id": "d869df85-f92c-4433-8801-df2fc2bb4cf0",
+      "name": "Invitación: Preparar"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuración Global').first().json.chatwoot_base_url }}/accounts/{{ $('Configuración Global').first().json.chatwoot_account_id }}/conversations/{{ $json.conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "={{ $json.caption }}"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            },
+            {
+              "name": "private",
+              "value": "false"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "attachments[]",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3072,
+        4140
+      ],
+      "id": "96b7d527-bb71-4efd-94c0-683889fd568b",
+      "name": "Invitación: Enviar",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Si no se pudo bajar la imagen, va el texto solo\nconst i = $('Invitación: Datos').first().json.i || {};\nconst enlace = `https://wa.me/${i.whatsapp}?text=${encodeURIComponent(`Quiero alertas IAgro ${i.codigo}`)}`;\nreturn [{ json: {\n  conversation_id: $('Registro: Decidir').first().json.conversation_id,\n  content: `🌧️ Yo recibo los avisos de lluvia de *IAgro* por WhatsApp: pronóstico de 7 días y a qué hora llueve en mi zona. ¡Es gratis!\\n\\nSuscríbete aquí 👉 ${enlace}`,\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2832,
+        4340
+      ],
+      "id": "6fcd47c7-0a63-42b9-aa1b-bd62b7bebcd5",
+      "name": "Invitación: Sin Imagen"
+    },
+    {
+      "parameters": {
+        "content": "## 9. Registro por WhatsApp (prototipo docs/prototipos/registro-por-whatsapp.html)\nQuien **no está registrado** y pide pronóstico / \"¿A qué hora llueve?\" (botones de la plantilla) se registra aquí mismo:\n- 📍 ubicación con el 📎 (se nombra con la ciudad más cercana) · ✍️ ciudad escrita (buscador Open-Meteo, Bolivia) · 🏙️ lista departamento → ciudad\n- El paso en curso vive en `bot_clima.registro_chat` (vence a las 24 h). El alta: `bot_clima.registrar_desde_chat()`\n- Respuesta: confirmación + lo que pidió + \"Invita N amigos = premio · x de N\" con botón 📤\n- 📤 Invitar amigos → imagen `/img/invitacion.jpg` con su enlace wa.me (\"Quiero alertas IAgro CODIGO\")\nMeta y premio de invitaciones: panel → Configuración → Suscripción.",
+        "height": 300,
+        "width": 900,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1872,
+        3140
+      ],
+      "id": "d2b9b555-b90c-4af0-a2d9-5304588477bf",
+      "name": "Nota - s10"
     }
   ],
   "pinData": {},
@@ -1743,6 +2167,13 @@
         [
           {
             "node": "¿Feria Necesita Clima?1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registro: Decidir",
             "type": "main",
             "index": 0
           }
@@ -2327,6 +2758,183 @@
       ]
     },
     "Preparar Mensajes Feria1": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registro: Decidir": {
+      "main": [
+        [
+          {
+            "node": "Registro: Acción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registro: Acción": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Registro: Guardar Paso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registro: Buscar Lugar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registro: Alta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invitación: Datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registro: Buscar Lugar": {
+      "main": [
+        [
+          {
+            "node": "Registro: Elegir Lugar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registro: Elegir Lugar": {
+      "main": [
+        [
+          {
+            "node": "Registro: ¿Registrar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registro: ¿Registrar?": {
+      "main": [
+        [
+          {
+            "node": "Registro: Alta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Registro: Guardar Paso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registro: Alta": {
+      "main": [
+        [
+          {
+            "node": "Registro: Clima",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registro: Clima": {
+      "main": [
+        [
+          {
+            "node": "Registro: Respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registro: Respuesta": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invitación: Datos": {
+      "main": [
+        [
+          {
+            "node": "Invitación: Imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invitación: Imagen": {
+      "main": [
+        [
+          {
+            "node": "Invitación: Preparar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invitación: Sin Imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invitación: Preparar": {
+      "main": [
+        [
+          {
+            "node": "Invitación: Enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invitación: Sin Imagen": {
       "main": [
         [
           {
