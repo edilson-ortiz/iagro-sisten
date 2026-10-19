@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronRightIcon, MapPinIcon, UsersIcon } from 'lucide-react';
 import { requerirSesion } from '@/lib/auth';
-import { conteoPorEstado, hoyLocal, listarUsuarios, listarZonas, planesActivos } from '@/lib/datos';
+import { conteoPorEstado, diasPrueba, hoyLocal, listarUsuarios, listarZonas, planesActivos } from '@/lib/datos';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,23 +13,27 @@ import { MarcarPagado } from '@/components/marcar-pagado';
 import { fmtRelativo, fmtTelefono } from '@/lib/utils';
 import { motivoDesactivadas } from '@/lib/situacion-alerta';
 import { CasillaTodos, CasillaUsuario, SeleccionUsuarios } from '@/components/usuarios/seleccion';
+import { NuevoUsuario } from '@/components/usuarios/nuevo-usuario';
 
 export const metadata: Metadata = { title: 'Usuarios' };
 
 export default async function UsuariosPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requerirSesion();
   const sp = await searchParams;
-  const [usuarios, conteos, zonas, planes, hoy] = await Promise.all([
+  const [usuarios, conteos, zonas, planes, hoy, prueba] = await Promise.all([
     listarUsuarios({ q: sp.q, estado: sp.estado, zona: sp.zona, orden: sp.orden }),
     conteoPorEstado(),
     listarZonas(),
     planesActivos(),
     hoyLocal(),
+    diasPrueba(),
   ]);
 
   return (
     <>
-      <Encabezado titulo="Usuarios" descripcion="Suscriptores del bot, su estado y vencimiento." />
+      <Encabezado titulo="Usuarios" descripcion="Suscriptores del bot, su estado y vencimiento.">
+        <NuevoUsuario planes={planes} diasPrueba={prueba} />
+      </Encabezado>
       <FiltrosUsuarios conteos={conteos} zonas={zonas} />
 
       {usuarios.length === 0 ? (

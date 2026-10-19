@@ -194,6 +194,12 @@ export async function planesActivos() {
     SELECT id, nombre, dias, monto, moneda FROM bot_clima.planes WHERE activo ORDER BY orden, id`);
 }
 
+/** Días de prueba gratis que recibe un usuario nuevo (Configuración) */
+export async function diasPrueba() {
+  const [r] = await query<{ dias: number }>(sql`SELECT bot_clima.cfg_num('prueba_dias', 30)::int AS dias`);
+  return r?.dias ?? 30;
+}
+
 /** Fecha de hoy (YYYY-MM-DD) en la zona horaria configurada */
 export async function hoyLocal() {
   const [r] = await query<{ hoy: string }>(sql`SELECT bot_clima.hoy()::text AS hoy`);
