@@ -1,0 +1,23 @@
+/* Nombre fijo junto a cada punto (sin caja, con halo para leerse en mapa y satélite) */
+.etiqueta {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0 2px;
+  font: 600 11px/1.2 system-ui, sans-serif;
+  color: #111827;
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 0 0 4px #fff;
+  white-space: nowrap;
+}
+.etiqueta::before {
+  display: none;
+}
+.etiquetaSel {
+  color: #92400e;
+}
+
+/* Mientras se dibuja una zona o un rectángulo */
+.dibujando,
+.dibujando :global(.leaflet-interactive) {
+  cursor: crosshair !important;
+}

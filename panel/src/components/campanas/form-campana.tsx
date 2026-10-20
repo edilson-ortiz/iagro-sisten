@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Papa from 'papaparse';
 import {
@@ -14,6 +14,7 @@ import { VistaPrevia } from '@/components/campanas/vista-previa';
 import { actualizarPlantillas, crearCampana } from '@/app/panel/(app)/campanas/actions';
 import type { Plantilla } from '@/lib/campanas/chatwoot';
 import { normalizarTelefono } from '@/lib/campanas/telefono';
+import { CLAVE_DESDE_MAPA, type ArchivoContactos } from '@/lib/campanas/desde-mapa';
 import { cn } from '@/lib/utils';
 
 type Archivo = { nombre: string; columnas: string[]; filas: Record<string, string>[] };
@@ -132,6 +133,23 @@ export function FormCampana({ plantillasIniciales, errorPlantillas }: { plantill
 
   const ejemplo = analisis.validos[Math.min(ver, Math.max(analisis.validos.length - 1, 0))];
   const sinMapear = variables.filter((v) => !mapeo[v]?.valor.trim());
+
+  // Contactos elegidos en el Mapa de clientes (/panel/mapa → "Crear difusión")
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('desde') !== 'mapa') return;
+    let a: ArchivoContactos | null = null;
+    try {
+      a = JSON.parse(sessionStorage.getItem(CLAVE_DESDE_MAPA) ?? 'null');
+      sessionStorage.removeItem(CLAVE_DESDE_MAPA);
+    } catch { /* sin datos */ }
+    if (!a?.filas?.length) return;
+    setArchivo(a);
+    setColTel('telefono');
+    setColNombre('nombre');
+    setVars({});
+    setVer(0);
+    toast.success(`${a.filas.length.toLocaleString('es-BO')} contactos cargados desde el mapa`);
+  }, []);
 
   async function cargar(file: File | undefined) {
     if (!file) return;
