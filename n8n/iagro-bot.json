@@ -2029,6 +2029,61 @@
       ],
       "id": "d2b9b555-b90c-4af0-a2d9-5304588477bf",
       "name": "Nota - s10"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.chatwoot_base_url }}/accounts/{{ $json.chatwoot_account_id }}/conversations/{{ $json.body.conversation.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        704
+      ],
+      "id": "b7a1c0de-0a11-4c6e-9e3a-7f1d2c3b4a51",
+      "name": "Leer Conversación",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pausa del bot cuando una persona atiende el chat en Chatwoot.\n// El bot NO responde si la conversación:\n//   1. tiene la etiqueta \"humano\" (pausa hasta quitarla), o\n//   2. está asignada a un agente que la abrió en las últimas PAUSA_HORAS horas.\n//      Si el agente se olvida de soltarla, el bot vuelve solo pasado ese tiempo.\n// Para devolver el chat al bot: quitar la asignación (y la etiqueta \"humano\" si la puso).\nconst PAUSA_HORAS = 6;\nconst ETIQUETA = 'humano';\n\nconst original = $('Configuración Global').first().json;\n// Datos frescos de la API; si falló, los del webhook\nconst api = $json && $json.id ? $json : {};\nconst conv = { ...(original.body?.conversation || {}), ...api };\n\nconst etiquetas = (conv.labels || []).map((x) => String(x).toLowerCase());\nconst asignado = conv.meta?.assignee || null;\nconst vistoAgente = Number(conv.agent_last_seen_at || 0) * 1000;  // segundos → ms\nconst reciente = vistoAgente > Date.now() - PAUSA_HORAS * 3600 * 1000;\n\nif (etiquetas.includes(ETIQUETA)) return [];\nif (asignado && reciente) return [];\nreturn [{ json: original }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        704
+      ],
+      "id": "b7a1c0de-0a11-4c6e-9e3a-7f1d2c3b4a52",
+      "name": "¿Atiende un Agente?"
+    },
+    {
+      "parameters": {
+        "content": "## Pausa por agente\nSi la conversación está **asignada a un agente** (que la abrió en las últimas 6 h) o tiene la etiqueta **humano**, el bot no responde. Para devolverla al bot: quitar la asignación / la etiqueta.",
+        "height": 220,
+        "width": 440,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        592,
+        912
+      ],
+      "id": "b7a1c0de-0a11-4c6e-9e3a-7f1d2c3b4a53",
+      "name": "Nota - Pausa agente"
     }
   ],
   "pinData": {},
@@ -2059,7 +2114,7 @@
       "main": [
         [
           {
-            "node": "Parsear Mensaje y Detectar Intención",
+            "node": "Leer Conversación",
             "type": "main",
             "index": 0
           }
@@ -2939,6 +2994,28 @@
         [
           {
             "node": "Normalizar Payload Saliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Conversación": {
+      "main": [
+        [
+          {
+            "node": "¿Atiende un Agente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Atiende un Agente?": {
+      "main": [
+        [
+          {
+            "node": "Parsear Mensaje y Detectar Intención",
             "type": "main",
             "index": 0
           }
