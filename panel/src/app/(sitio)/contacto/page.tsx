@@ -43,6 +43,16 @@ export default function Pagina() {
               </div>
             </div>
 
+            <div className="contact-card" style={{ marginBottom: '24px' }}>
+              <h3 style={{ marginBottom: '14px' }}>Datos legales</h3>
+              <div className="contact-list">
+                <div className="contact-item"><div><div className="ci-label">Razón social</div><div className="ci-value">Edilson Ortiz Serrano</div></div></div>
+                <div className="contact-item"><div><div className="ci-label">NIT</div><div className="ci-value">9674845011</div></div></div>
+                <div className="contact-item"><div><div className="ci-label">Emprendimiento</div><div className="ci-value">Iagro 360</div></div></div>
+                <div className="contact-item"><div><div className="ci-label">Dirección</div><div className="ci-value">Santa Cruz de la Sierra, Bolivia</div></div></div>
+              </div>
+            </div>
+
             <a href="https://wa.me/59176871405" target="_blank" rel="noopener" className="wa-band" style={{ display: 'flex', textDecoration: 'none', marginBottom: '24px' }}>
               <div>
                 <h3>Escribinos directo por WhatsApp</h3>

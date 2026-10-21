@@ -22,8 +22,7 @@ export function Pie() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© 2026 Iagro. Todos los derechos reservados.</span>
-          <span>Santa Cruz, Bolivia</span>
+          <span>© 2026 Iagro 360 - Emprendimiento de Edilson Ortiz Serrano - NIT 9674845011 - Santa Cruz, Bolivia. Todos los derechos reservados.</span>
         </div>
       </div>
     </footer>

@@ -12,7 +12,7 @@ export default function Pagina() {
         <div className="container">
           <span className="eyebrow">Documento legal</span>
           <h1>Términos de Servicio</h1>
-          <p className="updated">Última actualización: 20 de junio de 2026</p>
+          <p className="updated">Última actualización: 20 de octubre de 2026</p>
         </div>
       </section>
 
@@ -40,7 +40,7 @@ export default function Pagina() {
           <article className="legal-content">
 
             <h2 id="aceptacion">1. Aceptación de los términos</h2>
-            <p>Estos Términos de Servicio regulan el uso de los productos y servicios de <strong>Iagro</strong>: estaciones meteorológicas, pluviómetros digitales, la aplicación móvil <strong>Iagro Clima</strong> y el canal de notificaciones por WhatsApp. Al contratar nuestros equipos o usar la app, aceptás estos términos en su totalidad.</p>
+            <p>Estos Términos de Servicio regulan el uso de los productos y servicios de <strong>Iagro 360</strong>, emprendimiento de <strong>Edilson Ortiz Serrano</strong> (NIT 9674845011, Santa Cruz de la Sierra, Bolivia), en adelante «Iagro»: estaciones meteorológicas, pluviómetros digitales, la aplicación móvil <strong>Iagro Clima</strong> y el canal de notificaciones por WhatsApp. Al contratar nuestros equipos o usar la app, aceptás estos términos en su totalidad.</p>
 
             <h2 id="descripcion">2. Descripción del servicio</h2>
             <p>Iagro provee:</p>
@@ -100,6 +100,7 @@ export default function Pagina() {
             <h2 id="contacto-terminos">14. Contacto</h2>
             <p>Para consultas sobre estos Términos de Servicio, escribinos:</p>
             <ul>
+              <li>Titular: <strong>Edilson Ortiz Serrano</strong> (Iagro 360) · NIT 9674845011</li>
               <li>Email: <strong>serranoluizedil@gmail.com</strong></li>
               <li>WhatsApp: <strong>+591 76871405</strong></li>
               <li>Dirección: Barrio Magisterio Norte, entre 7º y 8º anillo, C. #2 Nº 40, Santa Cruz de la Sierra, Bolivia</li>
