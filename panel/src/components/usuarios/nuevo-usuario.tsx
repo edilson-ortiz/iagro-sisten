@@ -130,7 +130,7 @@ export function NuevoUsuario({ planes, diasPrueba }: { planes: PlanOpcion[]; dia
 
           <div className="grid gap-2">
             <Label htmlFor="n-notas">Notas (opcional)</Label>
-            <Textarea id="n-notas" rows={2} value={notas} placeholder="Ej: lo registró el técnico en la feria" onChange={(e) => setNotas(e.target.value)} />
+            <Textarea id="n-notas" rows={2} value={notas} placeholder="Ej: lo registró el técnico en campo" onChange={(e) => setNotas(e.target.value)} />
           </div>
         </div>
 

@@ -87,84 +87,6 @@
               "name": "planes_url",
               "value": "https://iagro360.xyz/planes",
               "type": "string"
-            },
-            {
-              "id": "cfg-feria-nombre",
-              "name": "feria_nombre",
-              "value": "Agro Vidas",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-0",
-              "name": "feria_lat",
-              "value": "-17.428293",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-1",
-              "name": "feria_lon",
-              "value": "-63.196858",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-2",
-              "name": "feria_dia1",
-              "value": "16/10/2026",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-3",
-              "name": "feria_dia2",
-              "value": "17/10/2026",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-4",
-              "name": "feria_stand",
-              "value": "Recinto ferial Agro Vidas",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-5",
-              "name": "feria_stand_lat",
-              "value": "-17.428293",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-6",
-              "name": "feria_stand_lon",
-              "value": "-63.196858",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-7",
-              "name": "feria_premio",
-              "value": "premios iAgro",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-8",
-              "name": "feria_precio",
-              "value": "25 Bs",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-9",
-              "name": "feria_wa_link",
-              "value": "https://wa.link/pkj891",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-10",
-              "name": "feria_zonas",
-              "value": "[{\"nombre\": \"Montero\", \"lat\": -17.3387, \"lon\": -63.2505}, {\"nombre\": \"Warnes\", \"lat\": -17.5103, \"lon\": -63.1647}, {\"nombre\": \"Mineros\", \"lat\": -17.1183, \"lon\": -63.2306}, {\"nombre\": \"Okinawa\", \"lat\": -17.2333, \"lon\": -62.8167}, {\"nombre\": \"Pailón\", \"lat\": -17.659, \"lon\": -62.7197}, {\"nombre\": \"Cuatro Cañadas\", \"lat\": -17.4333, \"lon\": -62.3333}, {\"nombre\": \"San Julián\", \"lat\": -16.9065, \"lon\": -62.6189}, {\"nombre\": \"Yapacaní\", \"lat\": -17.4, \"lon\": -63.8333}, {\"nombre\": \"Portachuelo\", \"lat\": -17.3517, \"lon\": -63.3936}, {\"nombre\": \"Cotoca\", \"lat\": -17.75, \"lon\": -63.05}]",
-              "type": "string"
-            },
-            {
-              "id": "cfg-feria-sectores",
-              "name": "feria_sectores",
-              "type": "string",
-              "value": "[{\"emoji\": \"🔥\", \"nombre\": \"Más visitados\", \"stands\": []}, {\"emoji\": \"🚜\", \"nombre\": \"Maquinaria\", \"stands\": []}, {\"emoji\": \"🌱\", \"nombre\": \"Semillas e insumos\", \"stands\": []}, {\"emoji\": \"🧪\", \"nombre\": \"Agroquímicos\", \"stands\": []}, {\"emoji\": \"🐄\", \"nombre\": \"Ganadería\", \"stands\": []}, {\"emoji\": \"💧\", \"nombre\": \"Riego y tecnología\", \"stands\": []}, {\"emoji\": \"🏦\", \"nombre\": \"Bancos y seguros\", \"stands\": []}, {\"emoji\": \"🍔\", \"nombre\": \"Comidas\", \"stands\": []}]"
             }
           ]
         },
@@ -182,7 +104,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\n// Chatwoot envia el texto en body.content\nconst textoOriginal = ($json.body?.content || '').trim();\nconst texto = textoOriginal.toLowerCase();\n// Version sin acentos para comparar palabras clave\nconst t = texto.normalize('NFD').replace(/[̀-ͯ]/g, '');\n\n// \"Dejar de recibir\" / \"Activar alertas\" (botones de la plantilla de alertas) los atiende el flujo\n// \"IAGRO · Seguimiento de estados\": desactiva/activa en el panel y confirma. El bot no responde.\nconst tBoton = t.replace(/^[^a-z0-9]+/, '').trim();   // \"⛈️ Solo lluvias fuertes\" → \"solo lluvias fuertes\"\nif (/^(dejar de recibir|no recibir alertas|desactivar alertas|activar alertas|recibir alertas|alta|solo lluvias fuertes|lluvias fuertes)$/.test(tBoton)) return [];\n\nconst telefonoRaw = $json.body?.conversation?.meta?.sender?.phone_number || '';\nconst telefono = telefonoRaw.replace('+', '');\n\nlet intent = 'desconocido';\nlet codigo = null;\nlet lluvia = null;          // { mm, fecha, lote } cuando se registra lluvia\nlet satelite_tipo = null;   // parcela | nubes | ndvi\nlet lluvia_error = null;\n\n// =====================================================\n// DETECTAR REGISTRO IAGRO\n// Formato esperado:\n// [IAGRO]:[BZuABk2]\n// =====================================================\nconst registroMatch = textoOriginal.match(/^\\s*\\[IAGRO\\]\\s*:\\s*\\[([A-Za-z0-9_-]+)\\]/i);\n\nif (registroMatch) {\n  intent = 'registro';\n  codigo = registroMatch[1];\n}\n\n// Invitación de un amigo (enlace wa.me del botón \"Invitar amigos\"): \"Quiero alertas IAgro R7K2\"\nlet codigo_invitado = null;\nconst invitacion = t.match(/quiero alertas iagro\\s+([a-z0-9]{4,8})/);\nif (intent === 'desconocido' && invitacion) {\n  intent = 'reg_inicio';\n  codigo_invitado = invitacion[1].toUpperCase();\n}\n\n// =====================================================\n// FERIA AGRO VIDAS + UBICACIÓN DEL LOTE\n// Va antes de las palabras clave: \"FERIA - Quiero el clima de mi zona\" contiene \"clima\"\n// Los botones de WhatsApp llegan con su TÍTULO como texto, por eso se detectan por palabras\n// =====================================================\nlet ubicacion = null;       // { lat, lon, nombre? } del lote, zona elegida o feria\nconst normalizar = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();\n\nlet zonas = [];\ntry { zonas = JSON.parse($json.feria_zonas || '[]'); } catch (e) { zonas = []; }\nconst adjuntoUbicacion = ($json.body?.attachments || []).find(a => a.file_type === 'location' && a.coordinates_lat != null);\nconst zonaElegida = zonas.find(z => normalizar(z.nombre) === t.replace(/^zona\\s+/, '').trim());\n\nlet sectores = [];\ntry { sectores = JSON.parse($json.feria_sectores || '[]'); } catch (e) { sectores = []; }\nconst soloLetras = (s) => normalizar(s).replace(/[^a-z0-9 ]/g, '').trim();\nconst sectorElegido = sectores.find(s => soloLetras(s.nombre) === soloLetras(t));\nlet feria_sector = null;\n\nif (intent === 'desconocido') {\n  if (adjuntoUbicacion) {\n    intent = 'ubicacion';\n    ubicacion = { lat: Number(adjuntoUbicacion.coordinates_lat), lon: Number(adjuntoUbicacion.coordinates_long) };\n  } else if (zonaElegida) {\n    intent = 'feria_zona';\n    ubicacion = { lat: Number(zonaElegida.lat), lon: Number(zonaElegida.lon), nombre: zonaElegida.nombre };\n  } else if (sectorElegido) {\n    intent = 'feria_sector';\n    feria_sector = sectorElegido.nombre;\n  } else if (/\\bguia\\b|sectores|recorrido|\\btour\\b/.test(t)) {\n    intent = 'feria_guia';\n  } else if (/elegir mi zona|lista de zonas|^zonas?$/.test(t)) {\n    intent = 'feria_zonas';\n  } else if (/\\bstand\\b/.test(t)) {\n    intent = 'feria_stand';\n  } else if (/clima (de |en )?(la )?feria/.test(t)) {\n    intent = 'feria_clima';\n  } else if (/invitar|referido/.test(t)) {\n    intent = 'invitar';   // \"📤 Invitar amigos\": imagen con su enlace de invitación\n  } else if (/^feria\\b|agro ?vidas/.test(t)) {\n    intent = 'feria';\n  }\n}\n\nif (intent === 'feria' || intent === 'feria_clima') {\n  ubicacion = { lat: Number($json.feria_lat), lon: Number($json.feria_lon), nombre: $json.feria_nombre || 'Agro Vidas' };\n}\n// Endpoint de la API de clima que necesita cada intención de feria (null = no consulta clima)\nconst clima_endpoint = intent === 'feria' ? 'hourly'\n  : ['feria_clima', 'ubicacion', 'feria_zona'].includes(intent) ? 'next24h'\n  : null;\n\n\n// =====================================================\n// REGISTRO RAPIDO DE LLUVIA\n// Ej: \"llovio 15 mm\", \"cayeron 8,5 milimetros ayer en el lote norte\", \"lluvia 12mm 05/10\"\n// =====================================================\nif (intent === 'desconocido' && /(llov|lluvi|cayo|cayeron|registr|anot|pluvio)/.test(t)) {\n  // Fecha explicita dd/mm o dd/mm/aaaa (se quita del texto para no confundirla con los mm)\n  let fecha = $now.toISODate();\n  let resto = t;\n  const fm = t.match(/\\b(\\d{1,2})[\\/-](\\d{1,2})(?:[\\/-](\\d{2,4}))?\\b/);\n  if (fm) {\n    const anio = fm[3] ? (fm[3].length === 2 ? 2000 + Number(fm[3]) : Number(fm[3])) : $now.year;\n    const f = DateTime.fromObject({ year: anio, month: Number(fm[2]), day: Number(fm[1]) });\n    if (f.isValid) fecha = f.toISODate();\n    resto = t.replace(fm[0], ' ');\n  } else if (/antier|anteayer/.test(t)) {\n    fecha = $now.minus({ days: 2 }).toISODate();\n  } else if (/\\bayer\\b|anoche/.test(t)) {\n    fecha = $now.minus({ days: 1 }).toISODate();\n  }\n\n  const conUnidad = resto.match(/(\\d+(?:[.,]\\d+)?)\\s*(mm|milimetros?|ml)\\b/);\n  const soloNumero = /(llovio|llovieron|cayo|cayeron)/.test(resto) ? resto.match(/\\b(\\d+(?:[.,]\\d+)?)\\b/) : null;\n  const m = conUnidad || soloNumero;\n\n  if (m) {\n    const mm = Math.round(parseFloat(m[1].replace(',', '.')) * 10) / 10;\n    const loteMatch = textoOriginal.match(/en\\s+(?:el\\s+|la\\s+)?(lote|parcela|potrero|chacra|campo|sector)\\s+([\\wáéíóúñÁÉÍÓÚÑ-]{1,30})/i);\n    const lote = loteMatch\n      ? `${loteMatch[1].charAt(0).toUpperCase()}${loteMatch[1].slice(1).toLowerCase()} ${loteMatch[2]}`\n      : 'Lote principal';\n\n    if (fecha > $now.toISODate()) {\n      intent = 'lluvia_ayuda';\n      lluvia_error = 'La fecha no puede ser futura.';\n    } else if (mm < 0 || mm > 500) {\n      intent = 'lluvia_ayuda';\n      lluvia_error = 'La cantidad debe estar entre 0 y 500 mm.';\n    } else {\n      intent = 'lluvia_registro';\n      lluvia = { mm, fecha, lote };\n    }\n  }\n}\n\n// =====================================================\n// INTENCIONES NORMALES\n// El orden importa: la primera que coincide gana.\n// (agregar nuevas palabras clave aqui = escala sin tocar el resto del flujo)\n// Las palabras van SIN acentos porque se comparan contra el texto normalizado.\n// =====================================================\n// \"¿A qué hora llueve?\" (botón de la plantilla de alertas o texto) y el botón \"⏰ ¿A qué hora?\" del radar\nif (intent === 'desconocido' && /a que hora llueve|que hora llueve|hora de (la )?lluvia|cuando llueve|a que hora va a llover|^[^a-z0-9]*a que hora[^a-z0-9]*$/.test(t)) {\n  intent = 'hora_lluvia';\n}\n\nif (intent === 'desconocido') {\n  const intents = {\n    lluvia_historial: ['historial', 'mis lluvias', 'cuanto llovio', 'acumulado', 'mis registros', 'cuaderno'],\n    lluvia_ayuda: ['registrar lluvia', 'anotar lluvia', 'pluviometro', 'registrar'],\n    alertas: ['alerta', 'helada', 'granizo', 'tormenta', 'riesgo', 'peligro'],\n    fumigar: ['fumig', 'pulveriz', 'asperj', 'aplicar'],\n    riego: ['riego', 'regar', 'evapotrans'],\n    viento: ['viento', 'vientos', 'rafaga', 'racha', 'ventarron', 'ventisca'],\n    satelite: ['satel', 'imagen', 'ndvi', 'nubes', 'vegetacion', 'salud del cultivo', 'mi parcela', 'foto'],\n    planes: ['planes', 'plan pro', 'precio', 'premium', 'suscrib', 'pagar', 'costo', 'cuanto cuesta'],\n    pronostico: ['pronostico', 'clima', 'lluvia', 'tiempo', 'llover', 'llueve'],\n    radar: ['radar'],\n    saludo: ['hola', 'buenas', 'buenos dias', 'buen dia'],\n    ayuda: ['ayuda', 'menu', 'opciones'],\n    saludo_final: ['gracias', 'ok', 'perfecto', 'listo', 'entendido', 'hasta luego', 'adios', 'chau', 'nos vemos']\n  };\n\n  for (const [nombre, palabras] of Object.entries(intents)) {\n    if (palabras.some(p => t.includes(p))) {\n      intent = nombre;\n      break;\n    }\n  }\n}\n\nif (intent === 'satelite') {\n  satelite_tipo = /ndvi|vegetacion|salud/.test(t) ? 'ndvi' : /nube/.test(t) ? 'nubes' : 'parcela';\n}\n\n// Intenciones que requieren usuario registrado (pasan por un solo IF)\nconst SERVICIOS = ['lluvia_registro', 'lluvia_historial', 'alertas', 'fumigar', 'riego', 'viento', 'satelite'];\n\nreturn [{\n  json: {\n    ...$json,\n    intent,\n    es_servicio: SERVICIOS.includes(intent) ? 'si' : 'no',\n    texto_original: textoOriginal,\n    texto,\n    codigo,\n    codigo_invitado,\n    lluvia,\n    lluvia_error,\n    satelite_tipo,\n    ubicacion,\n    clima_endpoint,\n    feria_sector,\n    clima_lat: ubicacion?.lat ?? null,\n    clima_lon: ubicacion?.lon ?? null,\n    conversation_id: $json.body?.conversation?.id,\n    account_id: $json.body?.account?.id,\n    contact_name: $json.body?.conversation?.meta?.sender?.name || 'Cliente',\n    telefono\n  }\n}];\n"
+        "jsCode": "\n// Chatwoot envia el texto en body.content\nconst textoOriginal = ($json.body?.content || '').trim();\nconst texto = textoOriginal.toLowerCase();\n// Version sin acentos para comparar palabras clave\nconst t = texto.normalize('NFD').replace(/[̀-ͯ]/g, '');\n\n// \"Dejar de recibir\" / \"Activar alertas\" (botones de la plantilla de alertas) los atiende el flujo\n// \"IAGRO · Seguimiento de estados\": desactiva/activa en el panel y confirma. El bot no responde.\nconst tBoton = t.replace(/^[^a-z0-9]+/, '').trim();   // \"⛈️ Solo lluvias fuertes\" → \"solo lluvias fuertes\"\nif (/^(dejar de recibir|no recibir alertas|desactivar alertas|activar alertas|recibir alertas|alta|solo lluvias fuertes|lluvias fuertes)$/.test(tBoton)) return [];\n\nconst telefonoRaw = $json.body?.conversation?.meta?.sender?.phone_number || '';\nconst telefono = telefonoRaw.replace('+', '');\n\nlet intent = 'desconocido';\nlet codigo = null;\nlet lluvia = null;          // { mm, fecha, lote } cuando se registra lluvia\nlet satelite_tipo = null;   // parcela | nubes | ndvi\nlet lluvia_error = null;\n\n// =====================================================\n// DETECTAR REGISTRO IAGRO\n// Formato esperado:\n// [IAGRO]:[BZuABk2]\n// =====================================================\nconst registroMatch = textoOriginal.match(/^\\s*\\[IAGRO\\]\\s*:\\s*\\[([A-Za-z0-9_-]+)\\]/i);\n\nif (registroMatch) {\n  intent = 'registro';\n  codigo = registroMatch[1];\n}\n\n// Invitación de un amigo (enlace wa.me del botón \"Invitar amigos\"): \"Quiero alertas IAgro R7K2\"\nlet codigo_invitado = null;\nconst invitacion = t.match(/quiero alertas iagro\\s+([a-z0-9]{4,8})/);\nif (intent === 'desconocido' && invitacion) {\n  intent = 'reg_inicio';\n  codigo_invitado = invitacion[1].toUpperCase();\n}\n\n// =====================================================\n// UBICACIÓN DEL LOTE (📎) E INVITAR AMIGOS\n// Los botones de WhatsApp llegan con su TÍTULO como texto, por eso se detectan por palabras\n// =====================================================\nlet ubicacion = null;       // { lat, lon } del lote que mandó con 📎 (registro por WhatsApp)\nconst adjuntoUbicacion = ($json.body?.attachments || []).find(a => a.file_type === 'location' && a.coordinates_lat != null);\n\nif (intent === 'desconocido') {\n  if (adjuntoUbicacion) {\n    intent = 'ubicacion';\n    ubicacion = { lat: Number(adjuntoUbicacion.coordinates_lat), lon: Number(adjuntoUbicacion.coordinates_long) };\n  } else if (/invitar|referido/.test(t)) {\n    intent = 'invitar';   // \"📤 Invitar amigos\": imagen con su enlace de invitación\n  }\n}\n\n\n// =====================================================\n// REGISTRO RAPIDO DE LLUVIA\n// Ej: \"llovio 15 mm\", \"cayeron 8,5 milimetros ayer en el lote norte\", \"lluvia 12mm 05/10\"\n// =====================================================\nif (intent === 'desconocido' && /(llov|lluvi|cayo|cayeron|registr|anot|pluvio)/.test(t)) {\n  // Fecha explicita dd/mm o dd/mm/aaaa (se quita del texto para no confundirla con los mm)\n  let fecha = $now.toISODate();\n  let resto = t;\n  const fm = t.match(/\\b(\\d{1,2})[\\/-](\\d{1,2})(?:[\\/-](\\d{2,4}))?\\b/);\n  if (fm) {\n    const anio = fm[3] ? (fm[3].length === 2 ? 2000 + Number(fm[3]) : Number(fm[3])) : $now.year;\n    const f = DateTime.fromObject({ year: anio, month: Number(fm[2]), day: Number(fm[1]) });\n    if (f.isValid) fecha = f.toISODate();\n    resto = t.replace(fm[0], ' ');\n  } else if (/antier|anteayer/.test(t)) {\n    fecha = $now.minus({ days: 2 }).toISODate();\n  } else if (/\\bayer\\b|anoche/.test(t)) {\n    fecha = $now.minus({ days: 1 }).toISODate();\n  }\n\n  const conUnidad = resto.match(/(\\d+(?:[.,]\\d+)?)\\s*(mm|milimetros?|ml)\\b/);\n  const soloNumero = /(llovio|llovieron|cayo|cayeron)/.test(resto) ? resto.match(/\\b(\\d+(?:[.,]\\d+)?)\\b/) : null;\n  const m = conUnidad || soloNumero;\n\n  if (m) {\n    const mm = Math.round(parseFloat(m[1].replace(',', '.')) * 10) / 10;\n    const loteMatch = textoOriginal.match(/en\\s+(?:el\\s+|la\\s+)?(lote|parcela|potrero|chacra|campo|sector)\\s+([\\wáéíóúñÁÉÍÓÚÑ-]{1,30})/i);\n    const lote = loteMatch\n      ? `${loteMatch[1].charAt(0).toUpperCase()}${loteMatch[1].slice(1).toLowerCase()} ${loteMatch[2]}`\n      : 'Lote principal';\n\n    if (fecha > $now.toISODate()) {\n      intent = 'lluvia_ayuda';\n      lluvia_error = 'La fecha no puede ser futura.';\n    } else if (mm < 0 || mm > 500) {\n      intent = 'lluvia_ayuda';\n      lluvia_error = 'La cantidad debe estar entre 0 y 500 mm.';\n    } else {\n      intent = 'lluvia_registro';\n      lluvia = { mm, fecha, lote };\n    }\n  }\n}\n\n// =====================================================\n// INTENCIONES NORMALES\n// El orden importa: la primera que coincide gana.\n// (agregar nuevas palabras clave aqui = escala sin tocar el resto del flujo)\n// Las palabras van SIN acentos porque se comparan contra el texto normalizado.\n// =====================================================\n// \"¿A qué hora llueve?\" (botón de la plantilla de alertas o texto) y el botón \"⏰ ¿A qué hora?\" del radar\nif (intent === 'desconocido' && /a que hora llueve|que hora llueve|hora de (la )?lluvia|cuando llueve|a que hora va a llover|^[^a-z0-9]*a que hora[^a-z0-9]*$/.test(t)) {\n  intent = 'hora_lluvia';\n}\n\nif (intent === 'desconocido') {\n  const intents = {\n    lluvia_historial: ['historial', 'mis lluvias', 'cuanto llovio', 'acumulado', 'mis registros', 'cuaderno'],\n    lluvia_ayuda: ['registrar lluvia', 'anotar lluvia', 'pluviometro', 'registrar'],\n    alertas: ['alerta', 'helada', 'granizo', 'tormenta', 'riesgo', 'peligro'],\n    fumigar: ['fumig', 'pulveriz', 'asperj', 'aplicar'],\n    riego: ['riego', 'regar', 'evapotrans'],\n    viento: ['viento', 'vientos', 'rafaga', 'racha', 'ventarron', 'ventisca'],\n    satelite: ['satel', 'imagen', 'ndvi', 'nubes', 'vegetacion', 'salud del cultivo', 'mi parcela', 'foto'],\n    planes: ['planes', 'plan pro', 'precio', 'premium', 'suscrib', 'pagar', 'costo', 'cuanto cuesta'],\n    pronostico: ['pronostico', 'clima', 'lluvia', 'tiempo', 'llover', 'llueve'],\n    radar: ['radar'],\n    saludo: ['hola', 'buenas', 'buenos dias', 'buen dia'],\n    ayuda: ['ayuda', 'menu', 'opciones'],\n    saludo_final: ['gracias', 'ok', 'perfecto', 'listo', 'entendido', 'hasta luego', 'adios', 'chau', 'nos vemos']\n  };\n\n  for (const [nombre, palabras] of Object.entries(intents)) {\n    if (palabras.some(p => t.includes(p))) {\n      intent = nombre;\n      break;\n    }\n  }\n}\n\nif (intent === 'satelite') {\n  satelite_tipo = /ndvi|vegetacion|salud/.test(t) ? 'ndvi' : /nube/.test(t) ? 'nubes' : 'parcela';\n}\n\n// Intenciones que requieren usuario registrado (pasan por un solo IF)\nconst SERVICIOS = ['lluvia_registro', 'lluvia_historial', 'alertas', 'fumigar', 'riego', 'viento', 'satelite'];\n\nreturn [{\n  json: {\n    ...$json,\n    intent,\n    es_servicio: SERVICIOS.includes(intent) ? 'si' : 'no',\n    texto_original: textoOriginal,\n    texto,\n    codigo,\n    codigo_invitado,\n    lluvia,\n    lluvia_error,\n    satelite_tipo,\n    ubicacion,\n    clima_lat: ubicacion?.lat ?? null,\n    clima_lon: ubicacion?.lon ?? null,\n    conversation_id: $json.body?.conversation?.id,\n    account_id: $json.body?.account?.id,\n    contact_name: $json.body?.conversation?.meta?.sender?.name || 'Cliente',\n    telefono\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -387,28 +309,6 @@
                     "id": "r-lluvia-ayuda",
                     "leftValue": "={{ $json.intent }}",
                     "rightValue": "lluvia_ayuda",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              }
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "id": "r-feria",
-                    "leftValue": "={{ $json.intent.startsWith('feria') || $json.intent === 'ubicacion' ? 'feria' : 'otro' }}",
-                    "rightValue": "feria",
                     "operator": {
                       "type": "string",
                       "operation": "equals"
@@ -1550,86 +1450,6 @@
     },
     {
       "parameters": {
-        "content": "## 8. Campaña FERIA AGRO VIDAS (no requiere registro)\n- **FERIA** → bienvenida + clima de los 2 días (API /hourly) + pide ubicación\n- 📍 **Ubicación** o 📋 **zona** → clima del lote (API /next24h) + promo con 3 botones\n- 🧭 Guía (⭐ Stand iAgro + sectores) · 🌤️ Clima feria · 👥 Invitar amigo\n- Empresas por sector: **feria_sectores** → `stands: [{\"nombre\":\"Empresa\",\"stand\":\"A-12\"}]`\nDatos editables en **Configuración Global → feria_***. No guarda nada en la BD.",
-        "height": 200,
-        "width": 560,
-        "color": 3
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        1792,
-        2880
-      ],
-      "id": "24550524-bc3e-45a4-8e59-f09b87584d6c",
-      "name": "Nota - s9"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "cond-feria-clima",
-              "leftValue": "={{ !!$json.clima_endpoint }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        1872,
-        3136
-      ],
-      "id": "6db7890b-41cc-4f22-b47b-ac2e5f4dace9",
-      "name": "¿Feria Necesita Clima?1"
-    },
-    {
-      "parameters": {
-        "url": "={{ $('Configuración Global').first().json.weather_api_url }}/forecast/{{ $json.clima_endpoint }}?lat={{ $json.clima_lat }}&lon={{ $json.clima_lon }}",
-        "options": {
-          "timeout": 15000
-        }
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        2112,
-        3056
-      ],
-      "id": "9c776f84-b556-40c3-aad4-d53f075d7ee3",
-      "name": "Consultar Clima Feria (API)1",
-      "onError": "continueErrorOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Mensajes de la campaña FERIA (nombre en Configuración Global → feria_nombre)\n// Llega desde \"Consultar Clima Feria (API)\" (con $json.data) o directo desde el IF (sin clima)\nconst ctx = $('Adjuntar Datos de Usuario').first().json;\nconst cfg = $('Configuración Global').first().json;\nconst conversationId = $('Webhook').first().json.body.conversation.id;\nconst intent = ctx.intent;\nconst data = $json.data || [];\nconst registrado = !!ctx.usuario?.id;\nconst feria = cfg.feria_nombre || 'Agro Vidas';\n\nconst nombre = String(ctx.contact_name || '').split(' ')[0] || 'productor';\nconst codigo = `AV${String(ctx.telefono || '').slice(-6)}`;\nconst r = (v) => Math.round(Number(v) || 0);\nconst n = (v) => Number(v) || 0;\nconst fmtMm = (mm) => mm <= 0 ? '0' : mm >= 1 ? String(Math.round(mm)) : (Math.round(mm * 10) / 10).toFixed(1);\nconst radarUrl = (lat, lon) => `https://www.ventusky.com/?p=${Number(lat).toFixed(3)};${Number(lon).toFixed(3)};9&l=rain-3h`;\nconst mapsUrl = (lat, lon) => `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;\nconst DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];\nconst diaSemana = (f) => { const [d, m, a] = f.split('/'); return DIAS[new Date(a, m - 1, d, 12).getDay()]; };\nconst json = (txt, def) => { try { return JSON.parse(txt || ''); } catch (e) { return def; } };\n\nconst msg = (content, items) => ({\n  json: {\n    conversation_id: conversationId,\n    content,\n    ...(items ? { content_type: 'input_select', content_attributes: { items } } : {})\n  }\n});\n\n// WhatsApp: máximo 3 botones y 20 caracteres por título\nconst BOTONES_FERIA = [\n  { title: '🧭 Guía de la feria', value: 'guia' },\n  { title: '🌤️ Clima feria', value: 'clima feria' },\n  { title: '👥 Invitar amigo', value: 'invitar' }\n];\nconst otrosBotones = (excluir) => BOTONES_FERIA.filter(b => b.value !== excluir);\n\n// ---------- Próximas 24 h (/forecast/next24h) ----------\nconst resumen24h = () => {\n  const tds = data.map(h => n(h.temperatura_c));\n  return {\n    ahora: data[0] || {},\n    proxima: data[1] || data[0] || {},\n    mm: data.reduce((s, h) => s + n(h.precipitacion_mm), 0),\n    prob: Math.max(0, ...data.map(h => n(h.probabilidad_precipitacion))),\n    tmin: Math.min(...tds), tmax: Math.max(...tds)\n  };\n};\nconst vientoTxt = (h) => `${r(h.velocidad_viento_kmh)} km/h ${h.direccion_viento || ''}${h.rafaga_kmh != null ? ` (ráf. ${r(h.rafaga_kmh)})` : ''}`;\n\n// =====================================================\n// 1) FERIA: bienvenida + clima de los 2 días + pedir ubicación\n// =====================================================\nif (intent === 'feria') {\n  const hoy = data[0]?.fecha;\n  const finGratis = (hoy ? DateTime.fromFormat(hoy, 'dd/MM/yyyy') : $now).plus({ months: 1 }).toFormat('dd/LL');\n\n  const statsDia = (dia) => {\n    const hs = dia.horarios || [];\n    const diurnas = hs.filter(h => { const x = Number(String(h.h).slice(0, 2)); return x >= 8 && x <= 20; });\n    const base = diurnas.length ? diurnas : hs;\n    const tds = hs.map(h => n(h.td));\n    const frec = {};\n    base.forEach(h => { if (h.vdId) frec[h.vdId] = (frec[h.vdId] || 0) + 1; });\n    return {\n      tmin: Math.min(...tds), tmax: Math.max(...tds),\n      prob: Math.max(0, ...hs.map(h => n(h.rp))),\n      mm: hs.reduce((s, h) => s + n(h.sr), 0),\n      viento: r(base.reduce((s, h) => s + n(h.vsd), 0) / (base.length || 1)),\n      rafaga: Math.max(0, ...base.map(h => n(h.vg))),\n      dir: Object.entries(frec).sort((a, b) => b[1] - a[1])[0]?.[0] || '',\n      lluviaDesde: base.find(h => n(h.rp) >= 50)?.h\n    };\n  };\n\n  const consejo = (s) => {\n    if (s.lluviaDesde) return `☔ lluvia desde ${s.lluviaDesde}`;\n    if (s.mm >= 2 || s.prob >= 40) return '🌦️ llevá paraguas';\n    if (s.rafaga >= 45 || s.viento >= 25) return '💨 ventoso';\n    if (s.tmax >= 33) return '🥵 calor, llevá agua';\n    if (s.tmin <= 12) return '🧥 llevá abrigo';\n    return '☀️ ideal para recorrer';\n  };\n\n  const lineas = [cfg.feria_dia1, cfg.feria_dia2].map(fecha => {\n    const dia = data.find(d => d.fecha === fecha);\n    if (!dia || !(dia.horarios || []).length) return null;\n    const s = statsDia(dia);\n    return `**${fecha === hoy ? 'Hoy' : diaSemana(fecha)} ${fecha.slice(0, 2)}:** ${r(s.tmin)}–${r(s.tmax)}° · 🌧️${r(s.prob)}% · 💨${s.viento} ${s.dir}\\n${consejo(s)}`;\n  }).filter(Boolean);\n\n  return [\n    msg(\n      `🌱 ¡Hola **${nombre}**! Bienvenido a iAgro en **${feria} 2026** 🎪\\n` +\n      `🎁 Tu mes gratis está activo hasta el **${finGratis}**\\n\\n` +\n      (lineas.length ? `🌤️ **Clima en la feria**\\n${lineas.join('\\n')}\\n\\n` : '') +\n      `📡 Radar: ${radarUrl(cfg.feria_lat, cfg.feria_lon)}`\n    ),\n    msg(\n      `📍 **Enviame la ubicación de tu lote** y te doy su pronóstico exacto.\\n` +\n      `👉 Tocá 📎 → Ubicación → mové el pin a tu campo.`,\n      [\n        { title: '📋 Elegir mi zona', value: 'elegir mi zona' },\n        { title: '🧭 Guía de la feria', value: 'guia' }\n      ]\n    )\n  ];\n}\n\n// =====================================================\n// 2) LISTA DE ZONAS (respaldo si no sabe enviar la ubicación)\n// =====================================================\nif (intent === 'feria_zonas') {\n  return [msg(\n    '📋 Elegí la zona de tu lote:',\n    json(cfg.feria_zonas, []).slice(0, 10).map(z => ({ title: z.nombre, value: z.nombre }))\n  )];\n}\n\n// =====================================================\n// 3) CONFIRMACIÓN DEL LOTE (ubicación o zona) + promo\n// =====================================================\nif (intent === 'ubicacion' || intent === 'feria_zona') {\n  const u = ctx.ubicacion || {};\n  let lugar;\n  if (intent === 'feria_zona') {\n    lugar = `en **${u.nombre}**`;\n  } else {\n    // Localidad más cercana de la lista de zonas (sin API externa)\n    const km = (a, b) => {\n      const rad = Math.PI / 180, dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;\n      const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;\n      return 12742 * Math.asin(Math.sqrt(x));\n    };\n    const cerca = json(cfg.feria_zonas, [])\n      .map(z => ({ ...z, d: km(u, { lat: Number(z.lat), lon: Number(z.lon) }) }))\n      .sort((a, b) => a.d - b.d)[0];\n    lugar = cerca && cerca.d <= 40 ? `cerca de **${cerca.nombre}**` : `en **${Number(u.lat).toFixed(3)}, ${Number(u.lon).toFixed(3)}**`;\n  }\n\n  const s = resumen24h();\n  const clima = data.length\n    ? `🌡️ ${r(s.ahora.temperatura_c)}° ${s.ahora.condicion || ''} · ${r(s.tmin)}–${r(s.tmax)}° en 24 h\\n` +\n      `🌧️ ${fmtMm(s.mm)} mm (${r(s.prob)}%) · 💨 ${vientoTxt(s.ahora)}`\n    : '⚠️ No pude obtener el clima de tu campo ahora.';\n\n  const salida = [msg(\n    `✅ Lote recibido ${lugar}\\n${clima}\\n📡 Radar: ${radarUrl(u.lat, u.lon)}\\n\\n` +\n    `¿Otro lote? Enviame otra ubicación.`\n  )];\n\n  if (!registrado) {\n    salida.push(msg(\n      `🎁 **Promo ${feria}**\\n` +\n      `✅ 1 mes gratis · luego ${cfg.feria_precio}/mes\\n` +\n      `✅ Alertas de surazo, tormenta y viento\\n` +\n      `👥 3 amigos con tu código **${codigo}** = 1 mes más gratis`,\n      BOTONES_FERIA\n    ));\n  }\n  return salida;\n}\n\n// =====================================================\n// 4) GUÍA DE LA FERIA: stand iAgro + sectores\n// =====================================================\nconst sectores = json(cfg.feria_sectores, []);\n\nif (intent === 'feria_guia') {\n  return [msg(\n    `🧭 **Guía ${feria}**\\nElegí qué querés visitar 👇`,\n    [\n      { title: '⭐ Stand iAgro', value: 'stand' },\n      ...sectores.slice(0, 9).map(s => ({ title: `${s.emoji} ${s.nombre}`, value: s.nombre }))\n    ]\n  )];\n}\n\nif (intent === 'feria_sector') {\n  const sec = sectores.find(s => s.nombre === ctx.feria_sector) || {};\n  const stands = sec.stands || [];\n  const lista = stands.length\n    ? stands.slice(0, 12).map(e => `• **${e.nombre}** — ${e.stand}`).join('\\n')\n    : `Estamos cargando los stands de este sector.\\nPasá por el **Stand iAgro** (${cfg.feria_stand}) y te orientamos 😉`;\n  return [msg(`${sec.emoji || '🧭'} **${sec.nombre || 'Sector'}**\\n${lista}`, BOTONES_FERIA)];\n}\n\nif (intent === 'feria_stand') {\n  return [msg(\n    `⭐ **Stand iAgro — ${cfg.feria_stand}**\\n` +\n    `Conocé el pronóstico de tu lote y participá del sorteo de **${cfg.feria_premio}** 🎁\\n` +\n    `🗺️ ${mapsUrl(cfg.feria_stand_lat, cfg.feria_stand_lon)}`,\n    BOTONES_FERIA\n  )];\n}\n\n// =====================================================\n// 5) CLIMA AHORA EN LA FERIA / INVITAR\n// =====================================================\nif (intent === 'feria_clima') {\n  if (!data.length) return [msg('⚠️ No pude obtener el clima de la feria ahora. Probá en unos minutos 🙏')];\n  const s = resumen24h();\n  return [msg(\n    `🌡️ **Ahora en la feria:** ${r(s.ahora.temperatura_c)}° ${s.ahora.condicion || ''}\\n` +\n    `🌧️ Lluvia próxima hora: ${r(s.proxima.probabilidad_precipitacion)}% · 💨 ${vientoTxt(s.ahora)}\\n` +\n    `📡 Radar: ${radarUrl(cfg.feria_lat, cfg.feria_lon)}`,\n    otrosBotones('clima feria')\n  )];\n}\n\nif (intent === 'feria_invitar') {\n  // Dos mensajes: la instrucción y el texto limpio, listo para reenviar\n  return [\n    msg('👥 Reenviá este mensaje a tus amigos productores 👇'),\n    msg(`Yo recibo el pronóstico de mi lote gratis en WhatsApp con iAgro 🌱 Escribí aquí 👉 ${cfg.feria_wa_link} y poné el código ${codigo}`)\n  ];\n}\n\nreturn [msg('🤔 No entendí tu mensaje. Escribí **Menú** para ver las opciones.')];\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2352,
-        3136
-      ],
-      "id": "e46f09fe-d640-40e1-8c5b-d2dcc5639754",
-      "name": "Preparar Mensajes Feria1"
-    },
-    {
-      "parameters": {
         "jsCode": "// Registro por WhatsApp: decide el siguiente paso según lo que mandó el contacto\n// accion: responder (pregunta + guarda el paso) | geocodificar (busca el lugar escrito) | registrar | invitar\nconst ctx = $json;\nconst webhook = $('Webhook').first().json.body;\nconst CIUDADES = {\"Santa Cruz\": [[\"Santa Cruz de la Sierra\", -17.786, -63.181], [\"Montero\", -17.339, -63.251], [\"Warnes\", -17.516, -63.168], [\"San Julián\", -16.9065, -62.6189], [\"Cuatro Cañadas\", -17.4333, -62.3333], [\"Pailón\", -17.659, -62.7197], [\"Yapacaní\", -17.4, -63.8333], [\"San Ignacio de Velasco\", -16.378, -60.965], [\"Camiri\", -20.041, -63.524]], \"Beni\": [[\"Trinidad\", -14.832, -64.903], [\"Riberalta\", -11.01, -66.053], [\"Guayaramerín\", -10.826, -65.358], [\"San Borja\", -14.852, -66.75], [\"Rurrenabaque\", -14.441, -67.528], [\"Santa Ana del Yacuma\", -13.744, -65.427], [\"San Ignacio de Moxos\", -14.995, -65.64], [\"Reyes\", -14.295, -67.336], [\"Magdalena\", -13.259, -64.053]], \"Cochabamba\": [[\"Cochabamba\", -17.382, -66.16], [\"Quillacollo\", -17.392, -66.278], [\"Sacaba\", -17.398, -66.038], [\"Punata\", -17.542, -65.835], [\"Villa Tunari\", -16.974, -65.421], [\"Chimoré\", -16.994, -65.153], [\"Ivirgarzama\", -17.038, -64.861], [\"Shinahota\", -16.985, -65.265], [\"Aiquile\", -18.204, -65.181]], \"La Paz\": [[\"La Paz\", -16.5, -68.15], [\"El Alto\", -16.504, -68.161], [\"Caranavi\", -15.834, -67.566], [\"Palos Blancos\", -15.587, -67.25], [\"Coroico\", -16.194, -67.73], [\"Achacachi\", -16.047, -68.685], [\"Viacha\", -16.65, -68.3], [\"Patacamaya\", -17.236, -67.914], [\"Copacabana\", -16.17, -69.079]], \"Tarija\": [[\"Tarija\", -21.535, -64.73], [\"Yacuiba\", -22.016, -63.678], [\"Bermejo\", -22.732, -64.337], [\"Villamontes\", -21.262, -63.469], [\"Entre Ríos\", -21.527, -64.173], [\"Padcaya\", -21.887, -64.713], [\"Uriondo\", -21.697, -64.656], [\"Caraparí\", -21.828, -63.743], [\"San Lorenzo\", -21.418, -64.75]], \"Chuquisaca\": [[\"Sucre\", -19.033, -65.263], [\"Monteagudo\", -19.8, -63.956], [\"Muyupampa\", -19.895, -63.751], [\"Camargo\", -20.641, -65.209], [\"Padilla\", -19.309, -64.303], [\"Villa Serrano\", -19.125, -64.323], [\"Tarabuco\", -19.182, -64.915], [\"Culpina\", -20.824, -64.945], [\"Zudáñez\", -19.118, -64.703]], \"Pando\": [[\"Cobija\", -11.027, -68.769], [\"Porvenir\", -9.983, -66.733], [\"Filadelfia\", -11.347, -68.758], [\"Puerto Rico\", -11.106, -67.552], [\"Bella Flor\", -11.142, -67.82], [\"Gonzalo Moreno\", -11.038, -66.134]], \"Potosí\": [[\"Potosí\", -19.584, -65.753], [\"Uyuni\", -20.46, -66.825], [\"Tupiza\", -21.443, -65.719], [\"Villazón\", -22.087, -65.594], [\"Llallagua\", -18.425, -66.578], [\"Betanzos\", -19.553, -65.454], [\"Cotagaita\", -20.817, -65.667], [\"Puna\", -19.795, -65.506], [\"Colquechaca\", -18.7, -66.004]], \"Oruro\": [[\"Oruro\", -17.972, -67.093], [\"Challapata\", -18.902, -66.77], [\"Huanuni\", -18.289, -66.836], [\"Caracollo\", -17.639, -67.219], [\"Huari\", -19.013, -66.777], [\"Eucaliptus\", -17.583, -67.517], [\"Toledo\", -18.181, -67.407], [\"Curahuara de Carangas\", -17.843, -68.409], [\"Salinas de G. Mendoza\", -19.637, -67.675]]};\nconst norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/^[^a-z0-9]+/, '').trim();\nconst nombreContacto = ctx.contact_name && ctx.contact_name !== 'Cliente' ? ctx.contact_name : null;\nconst base = {\n  conversation_id: webhook.conversation.id, telefono: ctx.telefono,\n  chatwoot_contact_id: webhook.conversation?.meta?.sender?.id ?? null,\n  pedido: ctx.reg_pedido || 'fc', nombre: nombreContacto, codigo_invitado: ctx.codigo_invitado || null,\n};\nconst salida = (accion, extra) => [{ json: { ...base, accion, ...extra } }];\nconst responder = (content, items, guardar) => salida('responder', {\n  content, ...(items ? { content_type: 'input_select', content_attributes: { items } } : {}), guardar,\n});\nconst pedirDepartamento = (prefijo = '') => responder(`${prefijo}Elige tu departamento 👇`,\n  Object.keys(CIUDADES).map((d) => ({ title: d, value: d })), { estado: 'ESPERANDO_DEPARTAMENTO' });\nconst km = (a, b) => {\n  const r = Math.PI / 180, dLat = (b[0] - a[0]) * r, dLon = (b[1] - a[1]) * r;\n  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLon / 2) ** 2;\n  return 12742 * Math.asin(Math.sqrt(x));\n};\n\n// 📤 Invitar amigos\nif (ctx.intent === 'invitar') {\n  if (ctx.usuario?.id) return salida('invitar', { usuario_id: ctx.usuario.id });\n  base.pedido = 'fc';\n}\n\n// 1) Pide la ubicación (un solo mensaje, con el botón de la lista)\nif (ctx.intent === 'reg_inicio' || ctx.intent === 'invitar') {\n  const para = base.pedido === 'hora' ? 'a qué hora llueve' : 'el pronóstico de 7 días';\n  return responder(\n    `🌾 Para decirte ${para} **en tu lote** necesito saber dónde está. Lo haces una sola vez.\\n\\n` +\n    `📍 Envíame tu ubicación: toca 📎 → **Ubicación** → **Enviar tu ubicación actual**\\n` +\n    `✍️ o escríbeme el nombre de tu ciudad o comunidad`,\n    [{ title: '🏙️ Elegir de lista', value: 'elegir de lista' }],\n    { estado: 'ESPERANDO_UBICACION' });\n}\n\n// 2) Ubicación con el 📎: se nombra con la ciudad más cercana de la lista\nif (ctx.intent === 'reg_ubicacion') {\n  const lat = Number(ctx.ubicacion.lat), lon = Number(ctx.ubicacion.lon);\n  let cerca = null;\n  for (const [depto, lista] of Object.entries(CIUDADES)) {\n    for (const [c, la, lo] of lista) {\n      const dist = km([lat, lon], [la, lo]);\n      if (!cerca || dist < cerca.dist) cerca = { nombre: c, depto, dist };\n    }\n  }\n  const zona = cerca && cerca.dist <= 40 ? `${cerca.nombre}, ${cerca.depto}` : null;\n  return salida('registrar', { reg: { lat, lon, zona, origen: 'pin' } });\n}\n\n// 3) Respuesta de texto o de lista\nconst txt = norm(ctx.texto_original);\nconst estado = ctx.chat?.estado;\nif (/^(elegir de (una )?lista|lista|elegir|ninguno|ninguna)$/.test(txt)) return pedirDepartamento();\n\nconst depto = Object.keys(CIUDADES).find((d) => norm(d) === txt);\nif (depto) {\n  return responder('Elige la ciudad más cercana a tu lote:', CIUDADES[depto].map(([c]) => ({ title: c, value: c })),\n    { estado: 'ESPERANDO_CIUDAD', departamento: depto });\n}\n\nif (estado === 'ELEGIR_LUGAR') {\n  const op = (ctx.chat.opciones || []).find((o) => norm(o.titulo) === txt || norm(o.nombre) === txt);\n  if (op) return salida('registrar', { reg: { lat: op.lat, lon: op.lon, zona: `${op.nombre}, ${op.depto}`, origen: 'geocoding' } });\n}\n\n// Ciudad de la lista (si esperaba ciudad, primero la del departamento elegido)\nconst orden = estado === 'ESPERANDO_CIUDAD' && ctx.chat.departamento ? [ctx.chat.departamento] : Object.keys(CIUDADES);\nfor (const d of orden) {\n  const c = (CIUDADES[d] || []).find(([n]) => norm(n) === txt);\n  if (c) return salida('registrar', { reg: { lat: c[1], lon: c[2], zona: `${c[0]}, ${d}`, origen: 'geocoding' } });\n}\n\nif (txt.length < 3) return pedirDepartamento('No encontré ese lugar. ');\n// Texto libre: se busca el lugar en Bolivia\nreturn salida('geocodificar', { q: String(ctx.texto_original || '').trim().slice(0, 60) });\n"
       },
       "type": "n8n-nodes-base.code",
@@ -2234,13 +2054,6 @@
         ],
         [
           {
-            "node": "¿Feria Necesita Clima?1",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "Registro: Decidir",
             "type": "main",
             "index": 0
@@ -2779,53 +2592,6 @@
       ]
     },
     "Formatear Viento por Horas": {
-      "main": [
-        [
-          {
-            "node": "Normalizar Payload Saliente",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "¿Feria Necesita Clima?1": {
-      "main": [
-        [
-          {
-            "node": "Consultar Clima Feria (API)1",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Preparar Mensajes Feria1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Consultar Clima Feria (API)1": {
-      "main": [
-        [
-          {
-            "node": "Preparar Mensajes Feria1",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Preparar Mensaje Error Clima",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Preparar Mensajes Feria1": {
       "main": [
         [
           {
