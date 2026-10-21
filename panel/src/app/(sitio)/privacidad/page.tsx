@@ -44,7 +44,7 @@ export default function Pagina() {
             <p>Al usar nuestros equipos, la app Iagro Clima o nuestro canal de WhatsApp, aceptás las prácticas descritas en este documento.</p>
 
             <h2 id="responsable">2. Responsable del tratamiento</h2>
-            <p>El responsable del tratamiento de los datos personales descritos en esta política es <strong>Edilson Ortiz Serrano</strong>, NIT <strong>9674845011</strong>, titular del emprendimiento <strong>Iagro 360</strong>, con domicilio en Barrio Magisterio Norte, entre séptimo y octavo anillo, Calle #2, Nº 40, Santa Cruz de la Sierra, Bolivia.</p>
+            <p>El responsable del tratamiento de los datos personales descritos en esta política es <strong>Edilson Ortiz Serrano</strong>, NIT <strong>9674845011</strong>, titular del emprendimiento <strong>Iagro 360</strong>, con domicilio en Santa Cruz de la Sierra, Bolivia.</p>
 
             <h2 id="datos-recolectados">3. Datos que recolectamos</h2>
             <p>Recolectamos distintos tipos de datos según cómo interactúes con nosotros:</p>
@@ -140,7 +140,7 @@ export default function Pagina() {
               <li>Responsable: <strong>Edilson Ortiz Serrano</strong> (Iagro 360) · NIT 9674845011</li>
               <li>Email: <strong>serranoluizedil@gmail.com</strong></li>
               <li>WhatsApp: <strong>+591 76871405</strong></li>
-              <li>Dirección: Barrio Magisterio Norte, entre 7º y 8º anillo, C. #2 Nº 40, Santa Cruz de la Sierra, Bolivia</li>
+              <li>Dirección: Santa Cruz de la Sierra, Bolivia</li>
             </ul>
 
           </article>

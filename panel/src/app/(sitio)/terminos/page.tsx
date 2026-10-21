@@ -103,7 +103,7 @@ export default function Pagina() {
               <li>Titular: <strong>Edilson Ortiz Serrano</strong> (Iagro 360) · NIT 9674845011</li>
               <li>Email: <strong>serranoluizedil@gmail.com</strong></li>
               <li>WhatsApp: <strong>+591 76871405</strong></li>
-              <li>Dirección: Barrio Magisterio Norte, entre 7º y 8º anillo, C. #2 Nº 40, Santa Cruz de la Sierra, Bolivia</li>
+              <li>Dirección: Santa Cruz de la Sierra, Bolivia</li>
             </ul>
 
           </article>

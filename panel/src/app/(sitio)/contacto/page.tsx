@@ -3,7 +3,7 @@ import { FormContacto } from '@/components/sitio/form-contacto';
 
 export const metadata: Metadata = {
   title: { absolute: 'Contacto — Iagro' },
-  description: 'Contactá a Iagro por WhatsApp, email o visitá nuestra oficina en Santa Cruz de la Sierra, Bolivia. Consultanos por estaciones meteorológicas y pluviómetros digitales.',
+  description: 'Contactá a Iagro por WhatsApp o email. Estamos en Santa Cruz de la Sierra, Bolivia. Consultanos por estaciones meteorológicas y pluviómetros digitales.',
 };
 
 export default function Pagina() {
@@ -35,10 +35,6 @@ export default function Pagina() {
                 <div className="contact-item" id="whatsapp">
                   <div className="ci-icon"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg></div>
                   <div><div className="ci-label">WhatsApp</div><div className="ci-value"><a href="https://wa.me/59176871405" target="_blank" rel="noopener">+591 76871405</a></div></div>
-                </div>
-                <div className="contact-item">
-                  <div className="ci-icon"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg></div>
-                  <div><div className="ci-label">Casa matriz</div><div className="ci-value">Barrio Magisterio Norte, entre 7º y 8º anillo, C. #2 Nº 40 — Santa Cruz de la Sierra, Bolivia</div></div>
                 </div>
               </div>
             </div>
