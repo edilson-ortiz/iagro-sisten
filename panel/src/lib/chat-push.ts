@@ -47,25 +47,53 @@ function resumen(texto: string | null, adjunto: string | null) {
 
 /** Avisa a todos los navegadores suscritos de ese teléfono; borra los que ya no existen (404/410) */
 export async function notificarChat(telefono: string, texto: string | null, adjunto: string | null = null) {
-  const tel = telefono.replace(/\D/g, '');
+  await enviarA(telefono.replace(/\D/g, ''), { titulo: 'IAGRO Clima', texto: resumen(texto, adjunto), tipo: 'chat' });
+}
+
+type Aviso = { titulo: string; texto: string; tipo: 'chat' | 'difusion' };
+
+/** Envía el aviso a cada navegador suscrito del teléfono. Devuelve cuántos llegaron y cuántos fallaron. */
+async function enviarA(tel: string, aviso: Aviso) {
   const subs = await query<{ id: number; endpoint: string; p256dh: string; auth: string }>(sql`
     SELECT id, endpoint, p256dh, auth FROM bot_clima.chat_web_push WHERE telefono = ${tel}`);
-  if (!subs.length) return;
+  if (!subs.length) return { enviados: 0, fallidos: 0 };
 
   const { publica, privada } = await clavesVapid();
-  const datos = JSON.stringify({ titulo: 'IAGRO Clima', texto: resumen(texto, adjunto), url: rutaChat(tel) });
+  const datos = JSON.stringify({ ...aviso, url: rutaChat(tel) });
+  let enviados = 0;
+  let fallidos = 0;
 
   await Promise.all(subs.map(async (s) => {
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, datos, {
         vapidDetails: { subject: 'https://iagro360.xyz', publicKey: publica, privateKey: privada },
-        TTL: 12 * 3600, urgency: 'high', timeout: 10_000,
+        TTL: aviso.tipo === 'difusion' ? 3 * 86400 : 12 * 3600, urgency: 'high', timeout: 10_000,
       });
+      enviados++;
       await query(sql`UPDATE bot_clima.chat_web_push SET ultimo_envio_el = now() WHERE id = ${s.id}`);
     } catch (err) {
+      fallidos++;
       const estado = (err as { statusCode?: number }).statusCode;
       if (estado === 404 || estado === 410) await query(sql`DELETE FROM bot_clima.chat_web_push WHERE id = ${s.id}`);
       else console.error('[chat push]', estado ?? '', (err as Error).message);
     }
   }));
+  return { enviados, fallidos };
+}
+
+/**
+ * Difusión desde el panel: una notificación a cada teléfono (todos sus navegadores).
+ * De a 25 teléfonos a la vez para no saturar el servidor.
+ */
+export async function difundirPush(telefonos: string[], titulo: string, texto: string) {
+  const total = { personas: 0, enviados: 0, fallidos: 0 };
+  for (let i = 0; i < telefonos.length; i += 25) {
+    const lote = await Promise.all(telefonos.slice(i, i + 25).map((t) => enviarA(t, { titulo, texto, tipo: 'difusion' })));
+    for (const r of lote) {
+      total.enviados += r.enviados;
+      total.fallidos += r.fallidos;
+      if (r.enviados) total.personas++;
+    }
+  }
+  return total;
 }

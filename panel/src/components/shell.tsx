@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useTheme } from 'next-themes';
 import {
   BellRingIcon, CloudRainIcon, CoinsIcon, SendIcon, HomeIcon, LogOutIcon, MegaphoneIcon, MenuIcon, MoonIcon, SettingsIcon, SunIcon,
-  UsersIcon, MonitorIcon, MapIcon,
+  UsersIcon, MonitorIcon, MapIcon, SmartphoneIcon,
 } from 'lucide-react';
 import { Dialog, DialogTitle, SheetContent } from '@/components/ui/dialog';
 import {
@@ -22,6 +22,7 @@ const NAV = [
   { href: '/panel', label: 'Inicio', icon: HomeIcon },
   { href: '/panel/usuarios', label: 'Usuarios', icon: UsersIcon },
   { href: '/panel/mapa', label: 'Mapa de clientes', icon: MapIcon },
+  { href: '/panel/app-web', label: 'App y notificaciones', icon: SmartphoneIcon },
   { href: '/panel/difusiones', label: 'Difusiones', icon: MegaphoneIcon, oculto: !MODULOS.difusiones },
   { href: '/panel/alertas', label: 'Alertas de lluvia', icon: CloudRainIcon },
   { href: '/panel/campanas', label: 'Difusiones', icon: SendIcon },

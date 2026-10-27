@@ -6,7 +6,7 @@ import { guardado, useAppWeb } from './app-web';
 import { type Accion, crearEstados, useEstadosVistos, VisorEstados } from './estados';
 import { Perfil } from './perfil';
 import { Bienvenida } from './bienvenida';
-import { leerUbicacion, SelectorUbicacion, TarjetaUbicacion, textoUbicacion, type Ubicacion } from './ubicacion';
+import { leerUbicacion, MiUbicacion, SelectorUbicacion, TarjetaUbicacion, textoUbicacion, type Ubicacion } from './ubicacion';
 import { VisorImagen } from './visor-imagen';
 import s from './chat.module.css';
 
@@ -101,6 +101,7 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
   const [ayudaIOS, setAyudaIOS] = useState(false);
   const [bannerCerrado, setBannerCerrado] = useState(true);
   const [selector, setSelector] = useState(false);
+  const [miUbicacion, setMiUbicacion] = useState(false);
   const [imagen, setImagen] = useState<{ url: string; hora: number } | null>(null);
   // El mapa del selector arranca en el campo del cliente (si está registrado) mientras llega el GPS
   const inicioMapa = useMemo(
@@ -339,7 +340,7 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
           <strong>IAGRO Clima <span className={s.verificado} title="Cuenta de empresa">✓</span></strong>
           <span>{escribiendo ? 'escribiendo…' : 'en línea'}</span>
         </button>
-        <button type="button" className={s.menu} onClick={() => setSelector(true)} aria-label="Enviar ubicación" title="Enviar mi ubicación">
+        <button type="button" className={s.menu} onClick={() => setMiUbicacion(true)} aria-label="Mi ubicación registrada" title="Mi ubicación registrada">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" fill="currentColor" /></svg>
         </button>
         <button type="button" className={s.menu} onClick={() => setPerfil(true)} aria-label="Info. de la empresa">
@@ -534,6 +535,16 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
 
       {visor != null && (
         <VisorEstados estados={estados} inicio={visor} alVer={vistos.marcar} alCerrar={cerrarVisor} alAccion={(a) => { setPerfil(false); ejecutar(a); }} />
+      )}
+
+      {miUbicacion && (
+        <MiUbicacion
+          telefono={telefono}
+          firma={firma}
+          inicial={cliente}
+          alCerrar={() => setMiUbicacion(false)}
+          alCambiar={() => { setMiUbicacion(false); setSelector(true); }}
+        />
       )}
 
       {selector && (

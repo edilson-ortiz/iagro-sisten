@@ -75,6 +75,127 @@ export function TarjetaUbicacion({ u }: { u: Ubicacion }) {
   );
 }
 
+/** Satélite de Esri (con nombres de lugares) y calles de OpenStreetMap */
+function crearCapas(L: typeof Leaflet) {
+  return {
+    satelite: L.layerGroup([
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri' }),
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }),
+    ]) as Leaflet.Layer,
+    mapa: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }) as Leaflet.Layer,
+  };
+}
+
+const cargarLeaflet = () => import('leaflet').then((mod) => (mod as unknown as { default?: typeof Leaflet }).default ?? mod);
+
+const PIN_HTML = '<svg viewBox="0 0 32 44" width="34" height="46" style="filter:drop-shadow(0 3px 3px rgba(0,0,0,.4))"><path d="M16 0C7.2 0 0 7 0 15.7 0 27.4 16 44 16 44s16-16.6 16-28.3C32 7 24.8 0 16 0z" fill="#e53935"/><circle cx="16" cy="15.5" r="6" fill="#fff"/></svg>';
+
+export type Campo = { id: number; nombre: string | null; lat: number | null; lon: number | null; zona?: string | null };
+
+/**
+ * La ubicación que el cliente tiene registrada en el sistema (la que usan su pronóstico y sus alertas).
+ * Se abre con el 📍 de la cabecera; "Cambiar ubicación" abre el selector para enviar una nueva.
+ */
+export function MiUbicacion({ telefono, firma, inicial, alCambiar, alCerrar }: {
+  telefono: string; firma: string; inicial: Campo | null; alCambiar: () => void; alCerrar: () => void;
+}) {
+  const caja = useRef<HTMLDivElement>(null);
+  const mapa = useRef<Leaflet.Map | null>(null);
+  const capas = useRef<{ satelite: Leaflet.Layer; mapa: Leaflet.Layer } | null>(null);
+  const [campo, setCampo] = useState<Campo | null>(inicial);
+  const [cargando, setCargando] = useState(true);
+  const [capa, setCapa] = useState<'satelite' | 'mapa'>('satelite');
+
+  // Datos al día (si cambió la ubicación por el chat, la página puede tener la anterior)
+  useEffect(() => {
+    fetch(`/chat/${telefono}/campo?k=${encodeURIComponent(firma)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j) setCampo(j.campo); })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, [telefono, firma]);
+
+  const lat = campo?.lat ?? null;
+  const lon = campo?.lon ?? null;
+
+  useEffect(() => {
+    if (lat == null || lon == null) return;
+    let vivo = true;
+    cargarLeaflet().then((L) => {
+      if (!vivo || !caja.current) return;
+      const m = L.map(caja.current, { zoomControl: false }).setView([lat, lon], 16);
+      m.attributionControl.setPrefix(false);
+      capas.current = crearCapas(L);
+      capas.current.satelite.addTo(m);
+      L.marker([lat, lon], { icon: L.divIcon({ className: '', html: PIN_HTML, iconSize: [34, 46], iconAnchor: [17, 46] }), interactive: false }).addTo(m);
+      mapa.current = m;
+      setTimeout(() => m.invalidateSize(), 50);
+    });
+    return () => { vivo = false; mapa.current?.remove(); mapa.current = null; };
+  }, [lat, lon]);
+
+  useEffect(() => {
+    const m = mapa.current, c = capas.current;
+    if (!m || !c) return;
+    const [poner, sacar] = capa === 'satelite' ? [c.satelite, c.mapa] : [c.mapa, c.satelite];
+    m.removeLayer(sacar);
+    if (!m.hasLayer(poner)) poner.addTo(m);
+  }, [capa]);
+
+  return (
+    <div className={s.selector} role="dialog" aria-modal="true" aria-label="Mi ubicación registrada">
+      <header className={s.perfilCabecera}>
+        <button type="button" onClick={alCerrar} aria-label="Volver">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" fill="currentColor" /></svg>
+        </button>
+        <span className={s.selectorTitulo}>Mi ubicación registrada</span>
+      </header>
+
+      {lat != null && lon != null ? (
+        <>
+          <div className={s.selectorMapa}>
+            <div ref={caja} className={s.selectorLienzo} />
+            <div className={s.selectorBotones}>
+              <button type="button" onClick={() => setCapa(capa === 'satelite' ? 'mapa' : 'satelite')} aria-label="Cambiar mapa">
+                {capa === 'satelite' ? '🗺️' : '🛰️'}<span>{capa === 'satelite' ? 'Mapa' : 'Satélite'}</span>
+              </button>
+              <button type="button" onClick={() => mapa.current?.setView([lat, lon], 16)} aria-label="Centrar en mi lote">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 3h-2.1A7 7 0 0 0 13 5.1V3h-2v2.1A7 7 0 0 0 5.1 11H3v2h2.1a7 7 0 0 0 5.9 5.9V21h2v-2.1a7 7 0 0 0 5.9-5.9H21v-2zm-9 6a5 5 0 1 1 0-10 5 5 0 0 1 0 10z" fill="currentColor" /></svg>
+              </button>
+            </div>
+          </div>
+          <div className={s.campoPanel}>
+            <div className={s.campoDatos}>
+              <span className={s.selectorIcono}>📍</span>
+              <div>
+                <strong>{campo?.nombre?.trim() || 'Mi campo'}</strong>
+                <small>{[campo?.zona, `${lat.toFixed(5)}, ${lon.toFixed(5)}`].filter(Boolean).join(' · ')}</small>
+              </div>
+            </div>
+            <p className={s.campoNota}>Con esta ubicación te enviamos el pronóstico y las alertas de lluvia.</p>
+            <div className={s.campoAcciones}>
+              <a href={urlMapa({ lat, lon })} target="_blank" rel="noopener noreferrer">🧭 Cómo llegar</a>
+              {campo?.id && <a href={`/radar/${campo.id}`} target="_blank" rel="noopener noreferrer">🌧️ Mi radar</a>}
+              <button type="button" className={s.campoPrincipal} onClick={alCambiar}>✏️ Cambiar ubicación</button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className={s.campoVacio}>
+          {cargando ? <p>Cargando tu ubicación…</p> : (
+            <>
+              <div className={s.tutorialIcono}>📍</div>
+              <h2>Aún no tienes una ubicación registrada</h2>
+              <p>Envíanos la ubicación de tu lote y te mandamos el pronóstico y las alertas de lluvia de ese lugar.</p>
+              <button type="button" className={s.tutorialBoton} onClick={alCambiar}>Enviar mi ubicación</button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type Direccion = { nombre: string; detalle: string };
 
 /** "Calle X, Barrio, Ciudad, Santa Cruz" a partir de la respuesta de Nominatim */
@@ -119,13 +240,8 @@ export function SelectorUbicacion({ inicial, alEnviar, alCerrar }: {
       lf.current = L;
       const p = inicial ?? SANTA_CRUZ;
       const m = L.map(caja.current, { zoomControl: false, attributionControl: true }).setView([p.lat, p.lon], inicial ? 15 : 6);
-      const satelite = L.layerGroup([
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri' }),
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }),
-      ]);
-      const calles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
-      capas.current = { satelite, mapa: calles };
-      satelite.addTo(m);
+      capas.current = crearCapas(L);
+      capas.current.satelite.addTo(m);
       m.attributionControl.setPrefix(false);
       m.on('movestart', () => setMoviendo(true));
       m.on('moveend', () => { setMoviendo(false); const c = m.getCenter(); setCentro({ lat: c.lat, lon: c.lng }); });

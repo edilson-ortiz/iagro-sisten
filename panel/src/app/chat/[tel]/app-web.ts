@@ -52,6 +52,14 @@ export function useAppWeb(telefono: string, firma: string) {
     setEsIOS(ios);
     setInstalada(standalone);
 
+    // Registro de la visita para el panel (App y notificaciones): si entró desde la app instalada y desde qué equipo
+    const plataforma = ios ? 'ios' : /android/i.test(navigator.userAgent) ? 'android' : 'pc';
+    const visita = (instalada: boolean) => fetch(`/chat/${telefono}/visita`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ k: firma, instalada, plataforma }),
+    }).catch(() => {});
+    visita(standalone);
+
     const soporta = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     setPermiso(soporta ? Notification.permission : ios && !standalone ? 'instalar-primero' : 'no-soportado');
 
@@ -63,7 +71,7 @@ export function useAppWeb(telefono: string, firma: string) {
     }
 
     const alAviso = (e: Event) => { e.preventDefault(); setAviso(e as EventoInstalar); };
-    const alInstalar = () => { setInstalada(true); setAviso(null); };
+    const alInstalar = () => { setInstalada(true); setAviso(null); visita(true); };
     window.addEventListener('beforeinstallprompt', alAviso);
     window.addEventListener('appinstalled', alInstalar);
     setListo(true);
@@ -71,7 +79,7 @@ export function useAppWeb(telefono: string, firma: string) {
       window.removeEventListener('beforeinstallprompt', alAviso);
       window.removeEventListener('appinstalled', alInstalar);
     };
-  }, [suscribir]);
+  }, [suscribir, telefono, firma]);
 
   /** Pide el permiso y suscribe este navegador. Devuelve el permiso final. */
   const activarNotificaciones = useCallback(async (): Promise<Permiso> => {
