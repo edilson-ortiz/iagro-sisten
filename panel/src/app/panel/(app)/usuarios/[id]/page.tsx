@@ -13,6 +13,8 @@ import { DiasRestantes, EstadoBadge, EstadoMensajeBadge } from '@/components/est
 import { MarcarPagado } from '@/components/marcar-pagado';
 import { EditarUsuario } from '@/components/editar-usuario';
 import { CambiarUbicacion } from '@/components/usuarios/cambiar-ubicacion';
+import { EnlaceChat } from '@/components/usuarios/enlace-chat';
+import { rutaChat } from '@/lib/chat-web';
 import { Reactivar } from '@/components/difusiones/reactivar';
 import { InterruptorAlertas } from '@/components/alertas/interruptor-alertas';
 import { motivoDesactivadas } from '@/lib/situacion-alerta';
@@ -84,6 +86,7 @@ export default async function FichaUsuarioPage({ params }: { params: Promise<{ i
         <div className="flex flex-wrap gap-2">
           <MarcarPagado usuario={u} planes={planes} hoy={hoy} />
           <EditarUsuario usuario={u} />
+          <EnlaceChat ruta={rutaChat(u.telefono)} />
           {urlChatwoot ? (
             <Button variant="outline" asChild>
               <a href={urlChatwoot} target="_blank" rel="noopener noreferrer"><MessageCircleIcon /> Chatwoot <ExternalLinkIcon className="size-3" /></a>

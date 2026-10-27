@@ -16,6 +16,20 @@ IDs de Chatwoot) se edita en el panel → **Configuración**; los flujos la leen
 **Orden para importar:** primero `iagro-enviar-whatsapp`, después los otros dos. En los nodos
 *Enviar WhatsApp* (alerta) y *Confirmar al usuario* (seguimiento) elige el flujo *IAGRO · Enviar WhatsApp*.
 
+## Chat web (alternativa a WhatsApp)
+
+El panel tiene un chat con aspecto de WhatsApp en `/chat/{teléfono}?k={firma}`. El enlace de cada cliente se copia
+desde el panel → ficha del usuario → **Chat web**. La firma `k` impide que alguien cambie el número y lea otro chat.
+
+- Usa un inbox de Chatwoot de tipo **API** (sin URL de webhook). Su ID va en el panel → Configuración →
+  *ID del inbox del chat web* (0 = apagado).
+- El cliente escribe como mensaje *incoming*; el bot (`iagro-bot.json`) responde a esa conversación igual que en
+  WhatsApp, porque identifica al cliente por el teléfono del contacto. Los botones (`input_select`) se ven como
+  botones (hasta 3) o como lista *Ver opciones* (más de 3); al tocarlos se envía su título, como en WhatsApp.
+- El webhook del bot tiene que recibir los mensajes de este inbox: si está en Chatwoot → Integraciones → Webhooks
+  (de la cuenta), ya los recibe; si es un *Agent Bot*, conéctalo también al inbox nuevo.
+- Las alertas y difusiones siguen saliendo por el inbox de WhatsApp (`iagro-enviar-whatsapp`).
+
 ## Lo que ahora hace el panel (ya no es de n8n)
 
 | Antes (n8n) | Ahora |

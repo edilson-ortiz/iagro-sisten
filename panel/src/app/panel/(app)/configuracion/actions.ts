@@ -28,6 +28,7 @@ const LIMITES: Record<string, [number, number]> = {
   difusion_pausar_sin_respuesta: [0, 20],
   chatwoot_account_id: [1, 1e9],
   chatwoot_inbox_id: [0, 1e9],
+  chatwoot_web_inbox_id: [0, 1e9],
 };
 
 /** Guarda varias claves de configuración a la vez (un grupo del formulario) */

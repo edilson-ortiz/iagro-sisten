@@ -1,0 +1,416 @@
+/* Chat web IAGRO: aspecto de WhatsApp (colores, burbujas con cola, botones bajo el mensaje, lista de opciones) */
+
+.app, .aviso {
+  --cab: #008069;
+  --cab-texto: #fff;
+  --fondo: #efeae2;
+  --trama: rgba(0, 0, 0, 0.035);
+  --mia: #d9fdd3;
+  --suya: #fff;
+  --texto: #111b21;
+  --meta: #667781;
+  --enlace: #027eb5;
+  --boton: #027eb5;
+  --leido: #53bdeb;
+  --barra: #f0f2f5;
+  --campo: #fff;
+  --verde: #00a884;
+  --dia: #fff;
+  --cifrado: #ffeecd;
+  --cifrado-texto: #54656f;
+  --sombra: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  --error: #f15c6d;
+  font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, 'Lucida Grande', Arial, Ubuntu, Cantarell, 'Fira Sans', sans-serif;
+  color: var(--texto);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  .app, .aviso {
+    --cab: #202c33;
+    --cab-texto: #e9edef;
+    --fondo: #0b141a;
+    --trama: rgba(255, 255, 255, 0.025);
+    --mia: #005c4b;
+    --suya: #202c33;
+    --texto: #e9edef;
+    --meta: #8696a0;
+    --enlace: #53bdeb;
+    --boton: #53bdeb;
+    --barra: #202c33;
+    --campo: #2a3942;
+    --dia: #182229;
+    --cifrado: #182229;
+    --cifrado-texto: #ffd279;
+    --sombra: 0 1px 0.5px rgba(11, 20, 26, 0.3);
+  }
+}
+
+.app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background-color: var(--fondo);
+  background-image:
+    radial-gradient(circle at 20px 20px, var(--trama) 2px, transparent 2.5px),
+    radial-gradient(circle at 60px 50px, var(--trama) 3px, transparent 3.5px),
+    radial-gradient(circle at 45px 85px, var(--trama) 1.5px, transparent 2px);
+  background-size: 90px 100px;
+}
+
+/* ---------- Cabecera ---------- */
+.cabecera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  min-height: 60px;
+  background: var(--cab);
+  color: var(--cab-texto);
+  flex-shrink: 0;
+  z-index: 2;
+}
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+}
+.titulo { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.titulo strong { font-size: 16px; font-weight: 500; }
+.titulo span { font-size: 13px; opacity: 0.85; }
+
+.error {
+  background: var(--error);
+  color: #fff;
+  font-size: 13.5px;
+  text-align: center;
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+
+/* ---------- Lista de mensajes ---------- */
+.lista {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.contenido {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 10px 4% 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cargando { text-align: center; color: var(--meta); font-size: 13px; padding: 10px; }
+
+.cifrado {
+  align-self: center;
+  max-width: min(480px, 92%);
+  margin: 6px 0 12px;
+  padding: 6px 12px;
+  border-radius: 7.5px;
+  background: var(--cifrado);
+  color: var(--cifrado-texto);
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: center;
+  box-shadow: var(--sombra);
+}
+
+.dia { display: flex; justify-content: center; margin: 10px 0 8px; position: sticky; top: 6px; z-index: 1; }
+.dia span {
+  background: var(--dia);
+  color: var(--meta);
+  font-size: 12.5px;
+  padding: 5px 12px;
+  border-radius: 7.5px;
+  box-shadow: var(--sombra);
+  text-transform: capitalize;
+}
+
+.fila { display: flex; margin-bottom: 2px; padding: 0 8px; }
+.fila.conCola { margin-top: 10px; }
+.filaMia { justify-content: flex-end; }
+.grupo { display: flex; flex-direction: column; max-width: min(78%, 560px); gap: 2px; }
+.filaMia .grupo { align-items: flex-end; }
+
+.burbuja {
+  position: relative;
+  display: block;
+  padding: 6px 7px 8px 9px;
+  border-radius: 7.5px;
+  box-shadow: var(--sombra);
+  font: inherit;
+  font-size: 14.2px;
+  line-height: 19px;
+  color: var(--texto);
+  text-align: left;
+  border: 0;
+  overflow-wrap: anywhere;
+  min-width: 70px;
+}
+.mia { background: var(--mia); }
+.suya { background: var(--suya); }
+button.burbuja { cursor: default; }
+.fallida { cursor: pointer !important; opacity: 0.85; }
+
+/* Cola de la burbuja (primer mensaje de cada racha) */
+.cola.suya { border-top-left-radius: 0; }
+.cola.mia { border-top-right-radius: 0; }
+.cola::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 13px;
+}
+.cola.suya::before { left: -8px; background: var(--suya); clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.cola.mia::before { right: -8px; background: var(--mia); clip-path: polygon(0 0, 100% 0, 0 100%); }
+
+.texto { white-space: pre-wrap; }
+.texto a { color: var(--enlace); text-decoration: none; }
+.texto a:hover { text-decoration: underline; }
+.texto code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+
+/* Hora y ticks: flotan a la derecha de la última línea, como en WhatsApp */
+.meta {
+  float: right;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 6px 0 -5px 10px;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--meta);
+  white-space: nowrap;
+  position: relative;
+  top: 2px;
+}
+.tick { width: 16px; height: 11px; color: var(--meta); }
+.tickLeido { color: var(--leido); }
+.tickFallo {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--error);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+.reintentar { font-size: 11.5px; color: var(--error); padding-right: 4px; }
+
+.imagen {
+  display: block;
+  max-width: 100%;
+  width: 330px;
+  max-height: 360px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin: -2px -3px 6px -5px;
+  background: rgba(0, 0, 0, 0.05);
+}
+.audio { width: 260px; max-width: 100%; margin-bottom: 4px; }
+.archivo, .ubicacion {
+  display: block;
+  padding: 10px;
+  margin: -2px -3px 6px -5px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--enlace);
+  text-decoration: none;
+}
+.ubicacion span { display: block; font-size: 12px; color: var(--meta); }
+
+/* Botones bajo el mensaje (respuestas rápidas de WhatsApp) */
+.conBotones { border-bottom-left-radius: 0; border-bottom-right-radius: 0; width: 100%; }
+.botones { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.boton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
+  background: var(--suya);
+  color: var(--boton);
+  border: 0;
+  border-radius: 7.5px;
+  box-shadow: var(--sombra);
+  font: inherit;
+  font-size: 14.2px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.boton:hover { filter: brightness(0.97); }
+.boton:active { filter: brightness(0.92); }
+.boton svg { width: 18px; height: 18px; }
+.botones .boton { border-radius: 0; }
+.botones .boton:last-child { border-bottom-left-radius: 7.5px; border-bottom-right-radius: 7.5px; }
+
+/* Indicador "escribiendo…" */
+.puntos { display: flex; gap: 4px; align-items: center; padding: 12px 14px; min-width: 0; }
+.puntos i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--meta);
+  animation: salto 1.2s infinite ease-in-out;
+}
+.puntos i:nth-child(2) { animation-delay: 0.15s; }
+.puntos i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes salto {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.empezar {
+  align-self: center;
+  width: min(320px, 90%);
+  margin-top: 24px;
+  text-align: center;
+  color: var(--meta);
+  font-size: 14px;
+}
+.empezar p { margin: 0 0 12px; }
+
+/* ---------- Redactor ---------- */
+.redactor {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 6px 10px;
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  background: var(--barra);
+  flex-shrink: 0;
+}
+.campo {
+  flex: 1;
+  display: flex;
+  background: var(--campo);
+  border-radius: 21px;
+  padding: 9px 16px;
+  min-height: 42px;
+  max-width: 880px;
+  margin-left: auto;
+}
+.campo textarea {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 16px; /* 16px: iOS no hace zoom al escribir */
+  line-height: 22px;
+  max-height: 140px;
+  padding: 0;
+}
+.campo textarea::placeholder { color: var(--meta); }
+.enviar {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  background: var(--verde);
+  color: #fff;
+  cursor: pointer;
+  margin-right: auto;
+}
+.enviar svg { width: 22px; height: 22px; margin-left: 2px; }
+.enviar:disabled { opacity: 0.55; cursor: default; }
+
+/* ---------- Lista de opciones (hoja inferior) ---------- */
+.fondoHoja {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 20, 26, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 10;
+  animation: aparecer 0.15s ease-out;
+}
+.hoja {
+  width: 100%;
+  max-width: 520px;
+  max-height: 75dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--suya);
+  border-radius: 14px 14px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: subir 0.2s ease-out;
+}
+.hojaCabecera {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(134, 150, 160, 0.2);
+  font-size: 16px;
+}
+.hojaCabecera strong { font-weight: 500; }
+.cerrar { border: 0; background: none; color: var(--meta); font-size: 18px; cursor: pointer; padding: 2px 4px; }
+.opciones { list-style: none; margin: 0; padding: 4px 0; overflow-y: auto; }
+.opciones button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border: 0;
+  background: none;
+  color: var(--texto);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.opciones button:hover { background: rgba(134, 150, 160, 0.1); }
+.opciones li + li button { border-top: 1px solid rgba(134, 150, 160, 0.12); }
+.radio {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--meta);
+}
+@keyframes subir { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes aparecer { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- Avisos (enlace no válido / chat apagado) ---------- */
+.aviso {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 24px 16px;
+  text-align: center;
+  background: var(--fondo);
+}
+.aviso img { border-radius: 50%; margin-bottom: 12px; }
+.aviso h1 { margin: 0; font-size: 20px; font-weight: 500; }
+.aviso p { margin: 0; color: var(--meta); max-width: 340px; }
+
+@media (max-width: 600px) {
+  .contenido { padding-left: 0; padding-right: 0; }
+  .grupo { max-width: 85%; }
+}
