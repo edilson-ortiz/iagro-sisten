@@ -296,18 +296,25 @@ button.burbuja { cursor: default; }
 }
 .reintentar { font-size: 11.5px; color: var(--error); padding-right: 4px; }
 
+/* Mensaje con imagen o ubicación: borde fino alrededor, como WhatsApp */
+.grupo:has(.conMedia) { width: min(78%, 330px); }
+.conMedia { padding: 3px 3px 7px; width: 100%; }
+.conMedia .texto { display: inline; padding: 0 4px; }
+.conMedia > .texto:not(:empty) { display: block; padding: 6px 6px 0; }
+
+/* Imagen completa, sin recortar (se ajusta al ancho y conserva la proporción) */
+.imagenBoton { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
 .imagen {
   display: block;
-  max-width: 100%;
-  width: 330px;
-  max-height: 360px;
-  object-fit: cover;
-  border-radius: 6px;
-  margin: -2px -3px 6px -5px;
-  background: rgba(0, 0, 0, 0.05);
+  width: 100%;
+  height: auto;
+  max-height: 460px;
+  object-fit: contain;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.06);
 }
 .audio { width: 260px; max-width: 100%; margin-bottom: 4px; }
-.archivo, .ubicacion {
+.archivo {
   display: block;
   padding: 10px;
   margin: -2px -3px 6px -5px;
@@ -316,7 +323,208 @@ button.burbuja { cursor: default; }
   color: var(--enlace);
   text-decoration: none;
 }
-.ubicacion span { display: block; font-size: 12px; color: var(--meta); }
+
+/* Tarjeta de ubicación: mapa con el pin, nombre y coordenadas */
+.tarjetaUbicacion { display: block; color: var(--texto); text-decoration: none; }
+.tarjetaUbicacion strong { display: block; padding: 7px 6px 0; font-size: 14.2px; font-weight: 500; }
+.tarjetaUbicacion small { display: block; padding: 1px 6px 0; font-size: 12.5px; color: var(--meta); }
+.miniatura { position: relative; height: 150px; overflow: hidden; border-radius: 5px; background: #e5e3df; }
+.miniaturaLienzo { position: absolute; left: 50%; top: 0; transform: translateX(-50%); }
+.miniaturaLienzo img { position: absolute; width: 256px; height: 256px; max-width: none; user-select: none; }
+.miniaturaPin { position: absolute; left: 50%; top: 50%; width: 28px; height: 38px; transform: translate(-50%, -100%); filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35)); }
+
+/* Ícono de ubicación dentro de la caja de texto (donde WhatsApp tiene el 📎) */
+.adjuntar {
+  flex-shrink: 0;
+  align-self: flex-end;
+  width: 30px;
+  height: 24px;
+  margin: -1px -6px -1px 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--meta);
+  cursor: pointer;
+}
+.adjuntar svg { width: 23px; height: 23px; }
+
+/* ---------- Selector de ubicación ---------- */
+.selector {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--suya);
+  animation: subir 0.2s ease-out;
+}
+.selectorTitulo { flex: 1; }
+.selectorBuscar {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #111b21;
+  font: inherit;
+  font-size: 16px;
+}
+.selectorMapa { position: relative; flex: 1; min-height: 240px; overflow: hidden; }
+.selectorLienzo { position: absolute; inset: 0; z-index: 0; background: #d9d6cf; }
+.selectorPin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 34px;
+  height: 46px;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.4));
+  transition: transform 0.15s ease-out;
+}
+.selectorPinArriba { transform: translate(-50%, calc(-100% - 12px)); }
+.selectorSombra {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  width: 12px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.selectorBotones { position: absolute; right: 12px; bottom: 16px; z-index: 2; display: grid; gap: 10px; }
+.selectorBotones button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  min-height: 48px;
+  padding: 4px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #54656f;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.selectorBotones button span { font-size: 9.5px; font-weight: 600; margin-top: 1px; }
+.selectorBotones button svg { width: 24px; height: 24px; }
+.selectorBotones button.activo { color: #1a73e8; }
+.selectorResultados {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 3;
+  max-height: 70%;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--suya);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+.selectorResultados button {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 11px 16px;
+  border: 0;
+  background: none;
+  color: var(--texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.selectorResultados button:hover { background: rgba(134, 150, 160, 0.1); }
+.selectorResultados strong { display: block; font-weight: 500; font-size: 15px; }
+.selectorResultados small { display: block; color: var(--meta); font-size: 12.5px; }
+.selectorVacio { padding: 14px 16px; color: var(--meta); font-size: 14px; }
+.selectorPanel { padding: 6px 0 max(10px, env(safe-area-inset-bottom)); background: var(--suya); box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12); z-index: 1; }
+.selectorAviso { margin: 8px 16px; color: var(--meta); font-size: 13.5px; line-height: 1.4; }
+.selectorOpcion {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border: 0;
+  background: none;
+  color: var(--texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.selectorOpcion:hover { background: rgba(134, 150, 160, 0.08); }
+.selectorOpcion:disabled { opacity: 0.6; cursor: default; }
+.selectorOpcion strong { display: block; font-weight: 500; font-size: 15.5px; color: var(--verde); }
+.selectorOpcion small { display: block; color: var(--meta); font-size: 13px; margin-top: 2px; }
+.selectorIcono {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 168, 132, 0.12);
+  font-size: 20px;
+}
+.selectorIconoGps { color: #1a73e8; background: rgba(26, 115, 232, 0.12); font-size: 22px; }
+
+/* ---------- Visor de imagen ---------- */
+.visorImagen {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  background: #0b141a;
+  color: #fff;
+  animation: aparecer 0.15s ease-out;
+}
+.visorImagenCabecera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: rgba(11, 20, 26, 0.85);
+  z-index: 1;
+}
+.visorImagenCabecera > div { flex: 1; display: flex; flex-direction: column; line-height: 1.3; }
+.visorImagenCabecera strong { font-size: 16px; font-weight: 500; }
+.visorImagenCabecera span { font-size: 12.5px; opacity: 0.75; text-transform: capitalize; }
+.visorImagenCabecera button, .visorImagenCabecera a {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+}
+.visorImagenCabecera a:hover, .visorImagenCabecera button:hover { background: rgba(255, 255, 255, 0.1); }
+.visorImagenCabecera svg { width: 24px; height: 24px; }
+.visorImagenArea {
+  position: relative;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+.visorImagenArea img { max-width: 100%; max-height: 100%; object-fit: contain; will-change: transform; cursor: grab; }
+.visorImagenCargando { position: absolute; color: rgba(255, 255, 255, 0.6); font-size: 14px; }
+.visorImagenAyuda { margin: 0; padding: 8px 16px max(12px, env(safe-area-inset-bottom)); text-align: center; font-size: 12.5px; color: rgba(255, 255, 255, 0.55); }
 
 /* Botones bajo el mensaje (respuestas rápidas de WhatsApp) */
 /* Mensaje con botones: burbuja y botones forman una sola tarjeta del mismo ancho */

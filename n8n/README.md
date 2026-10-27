@@ -29,6 +29,9 @@ desde el panel → ficha del usuario → **Chat web**. La firma `k` impide que a
 - El webhook del bot tiene que recibir los mensajes de este inbox: si está en Chatwoot → Integraciones → Webhooks
   (de la cuenta), ya los recibe; si es un *Agent Bot*, conéctalo también al inbox nuevo.
 - Las alertas y difusiones siguen saliendo por el inbox de WhatsApp (`iagro-enviar-whatsapp`).
+- **Ubicación:** el cliente la envía desde el mapa (botón 📍) como texto `📍 nombre` + `https://maps.google.com/?q=lat,lon`
+  (Chatwoot no deja crear adjuntos de ubicación por la API). El nodo *Parsear Mensaje y Detectar Intención* del bot
+  reconoce ese enlace igual que un 📎 de WhatsApp.
 - Es una app instalable (PWA) con notificaciones push: cuando el bot o un agente responde, el webhook del panel
   (Configuración → WhatsApp y Chatwoot → *Webhook del panel*) avisa al navegador del cliente. Sin ese webhook
   en Chatwoot, el chat funciona pero no llegan notificaciones.

@@ -6,6 +6,8 @@ import { guardado, useAppWeb } from './app-web';
 import { type Accion, crearEstados, useEstadosVistos, VisorEstados } from './estados';
 import { Perfil } from './perfil';
 import { Bienvenida } from './bienvenida';
+import { leerUbicacion, SelectorUbicacion, TarjetaUbicacion, textoUbicacion, type Ubicacion } from './ubicacion';
+import { VisorImagen } from './visor-imagen';
 import s from './chat.module.css';
 
 /** Cliente registrado en bot_clima.usuarios (para su radar en los estados) */
@@ -64,17 +66,18 @@ function Ticks({ estado }: { estado: 'reloj' | 'enviado' | 'leido' | 'fallo' }) 
   );
 }
 
-function Adjunto({ a }: { a: AdjuntoChat }) {
+function Adjunto({ a, alAbrir }: { a: AdjuntoChat; alAbrir: (url: string) => void }) {
   if (a.tipo === 'location' && a.lat != null && a.lon != null) {
-    return (
-      <a className={s.ubicacion} href={`https://www.google.com/maps?q=${a.lat},${a.lon}`} target="_blank" rel="noopener noreferrer">
-        📍 {a.nombre || 'Ubicación'} <span>{a.lat.toFixed(4)}, {a.lon.toFixed(4)}</span>
-      </a>
-    );
+    return <TarjetaUbicacion u={{ lat: a.lat, lon: a.lon, nombre: a.nombre || 'Ubicación' }} />;
   }
   if (!a.url) return null;
   if (a.tipo === 'image') {
-    return <a href={a.url} target="_blank" rel="noopener noreferrer"><img className={s.imagen} src={a.miniatura || a.url} alt="" loading="lazy" /></a>;
+    // La imagen completa (la miniatura de Chatwoot viene recortada); al tocarla se abre el visor con zoom
+    return (
+      <button type="button" className={s.imagenBoton} onClick={() => alAbrir(a.url!)} aria-label="Ver imagen">
+        <img className={s.imagen} src={a.url} alt="" loading="lazy" />
+      </button>
+    );
   }
   if (a.tipo === 'video') return <video className={s.imagen} src={a.url} controls preload="metadata" />;
   if (a.tipo === 'audio') return <audio className={s.audio} src={a.url} controls preload="metadata" />;
@@ -97,6 +100,13 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
   const [tutorial, setTutorial] = useState(false);
   const [ayudaIOS, setAyudaIOS] = useState(false);
   const [bannerCerrado, setBannerCerrado] = useState(true);
+  const [selector, setSelector] = useState(false);
+  const [imagen, setImagen] = useState<{ url: string; hora: number } | null>(null);
+  // El mapa del selector arranca en el campo del cliente (si está registrado) mientras llega el GPS
+  const inicioMapa = useMemo(
+    () => (cliente?.lat != null && cliente?.lon != null ? { lat: cliente.lat, lon: cliente.lon } : null),
+    [cliente],
+  );
 
   const app = useAppWeb(telefono, firma);
   const hoy = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
@@ -329,6 +339,9 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
           <strong>IAGRO Clima <span className={s.verificado} title="Cuenta de empresa">✓</span></strong>
           <span>{escribiendo ? 'escribiendo…' : 'en línea'}</span>
         </button>
+        <button type="button" className={s.menu} onClick={() => setSelector(true)} aria-label="Enviar ubicación" title="Enviar mi ubicación">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" fill="currentColor" /></svg>
+        </button>
         <button type="button" className={s.menu} onClick={() => setPerfil(true)} aria-label="Info. de la empresa">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2" fill="currentColor" /><circle cx="12" cy="12" r="2" fill="currentColor" /><circle cx="12" cy="19" r="2" fill="currentColor" /></svg>
         </button>
@@ -360,14 +373,16 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
             diaPrevio = d;
             autorPrevio = m.mio;
             const lista3 = m.botones.length <= 3;
+            const ubic = leerUbicacion(m.texto);
+            const media = !!ubic || m.adjuntos.some((a) => a.tipo === 'image' || a.tipo === 'location');
             return (
               <Fragment key={m.id}>
                 {nuevoDia && <div className={s.dia}><span>{d}</span></div>}
                 <div className={`${s.fila} ${m.mio ? s.filaMia : ''} ${cola ? s.conCola : ''}`}>
                   <div className={s.grupo}>
-                    <div className={`${s.burbuja} ${m.mio ? s.mia : s.suya} ${cola ? s.cola : ''} ${m.botones.length ? s.conBotones : ''}`}>
-                      {m.adjuntos.map((a, i) => <Adjunto key={i} a={a} />)}
-                      {m.texto && <span className={s.texto}>{formato(m.texto)}</span>}
+                    <div className={`${s.burbuja} ${m.mio ? s.mia : s.suya} ${cola ? s.cola : ''} ${m.botones.length ? s.conBotones : ''} ${media ? s.conMedia : ''}`}>
+                      {m.adjuntos.map((a, i) => <Adjunto key={i} a={a} alAbrir={(url) => setImagen({ url, hora: m.hora })} />)}
+                      {ubic ? <TarjetaUbicacion u={ubic} /> : m.texto && <span className={s.texto}>{formato(m.texto)}</span>}
                       <span className={`${s.espacio} ${m.mio ? s.espacioMio : ''}`} />
                       <span className={s.meta}>
                         {hora(m.hora)}
@@ -397,6 +412,7 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
           })}
 
           {pendientes.map((p) => {
+            const ubic = leerUbicacion(p.texto);
             const cola = autorPrevio !== true;
             autorPrevio = true;
             return (
@@ -404,11 +420,11 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
                 <div className={s.grupo}>
                   <button
                     type="button"
-                    className={`${s.burbuja} ${s.mia} ${cola ? s.cola : ''} ${p.fallo ? s.fallida : ''}`}
+                    className={`${s.burbuja} ${s.mia} ${cola ? s.cola : ''} ${p.fallo ? s.fallida : ''} ${ubic ? s.conMedia : ''}`}
                     onClick={() => p.fallo && enviar(p.texto, p.clave)}
                     title={p.fallo ? 'Toca para reintentar' : undefined}
                   >
-                    <span className={s.texto}>{formato(p.texto)}</span>
+                    {ubic ? <TarjetaUbicacion u={ubic} /> : <span className={s.texto}>{formato(p.texto)}</span>}
                     <span className={`${s.espacio} ${s.espacioMio}`} />
                     <span className={s.meta}>{hora(p.hora)}<Ticks estado={p.fallo ? 'fallo' : 'reloj'} /></span>
                   </button>
@@ -447,6 +463,9 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
             maxLength={4000}
             enterKeyHint="send"
           />
+          <button type="button" className={s.adjuntar} onClick={() => setSelector(true)} aria-label="Enviar ubicación">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" fill="currentColor" /></svg>
+          </button>
         </div>
         <button type="submit" className={s.enviar} disabled={!texto.trim()} aria-label="Enviar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10.2 15 12 3.4 13.8z" fill="currentColor" /></svg>
@@ -515,6 +534,23 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
 
       {visor != null && (
         <VisorEstados estados={estados} inicio={visor} alVer={vistos.marcar} alCerrar={cerrarVisor} alAccion={(a) => { setPerfil(false); ejecutar(a); }} />
+      )}
+
+      {selector && (
+        <SelectorUbicacion
+          inicial={inicioMapa}
+          alCerrar={() => setSelector(false)}
+          alEnviar={(u: Ubicacion) => { setSelector(false); enviar(textoUbicacion(u)); }}
+        />
+      )}
+
+      {imagen && (
+        <VisorImagen
+          url={imagen.url}
+          fecha={`${dia(imagen.hora)} ${hora(imagen.hora)}`}
+          descarga={`/chat/${telefono}/archivo?k=${encodeURIComponent(firma)}&url=${encodeURIComponent(imagen.url)}`}
+          alCerrar={() => setImagen(null)}
+        />
       )}
 
       {tutorial && <Bienvenida app={app} alTerminar={terminarTutorial} alInstalarIOS={() => setAyudaIOS(true)} />}
