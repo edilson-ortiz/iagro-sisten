@@ -29,6 +29,9 @@ desde el panel → ficha del usuario → **Chat web**. La firma `k` impide que a
 - El webhook del bot tiene que recibir los mensajes de este inbox: si está en Chatwoot → Integraciones → Webhooks
   (de la cuenta), ya los recibe; si es un *Agent Bot*, conéctalo también al inbox nuevo.
 - Las alertas y difusiones siguen saliendo por el inbox de WhatsApp (`iagro-enviar-whatsapp`).
+- Es una app instalable (PWA) con notificaciones push: cuando el bot o un agente responde, el webhook del panel
+  (Configuración → WhatsApp y Chatwoot → *Webhook del panel*) avisa al navegador del cliente. Sin ese webhook
+  en Chatwoot, el chat funciona pero no llegan notificaciones.
 
 ## Lo que ahora hace el panel (ya no es de n8n)
 

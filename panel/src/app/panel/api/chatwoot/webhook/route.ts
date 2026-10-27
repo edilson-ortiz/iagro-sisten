@@ -2,17 +2,31 @@ import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { query, sql } from '@/lib/db';
 import { aplicarEstado, aplicarRespuesta } from '@/lib/campanas/trabajador';
+import { confChatWeb } from '@/lib/chat-web';
+import { notificarChat } from '@/lib/chat-push';
 
 /**
  * Webhook de Chatwoot (Configuración → Integraciones → Webhooks), eventos "Mensaje creado" y "Mensaje actualizado".
  * URL: https://<sitio>/panel/api/chatwoot/webhook?token=<chatwoot_webhook_token>
- * Actualiza al instante el estado de las difusiones (entregado / leído / falló) y quién respondió.
+ * Actualiza al instante el estado de las difusiones (entregado / leído / falló) y quién respondió,
+ * y avisa por notificación push al cliente del chat web cuando el bot o un agente le responde.
  */
 type Evento = {
   event?: string; id?: number; message_type?: string | number; status?: string; private?: boolean;
   content?: string | null; created_at?: string | number;
-  conversation?: { id?: number }; content_attributes?: { external_error?: string } | null;
+  conversation?: { id?: number; inbox_id?: number; meta?: { sender?: { phone_number?: string | null } } };
+  inbox?: { id?: number }; attachments?: { file_type?: string }[];
+  content_attributes?: { external_error?: string } | null;
 };
+
+/** Respuesta nueva en una conversación del chat web → notificación al navegador del cliente */
+async function avisarChatWeb(e: Evento) {
+  const tel = e.conversation?.meta?.sender?.phone_number?.replace(/\D/g, '');
+  if (e.event !== 'message_created' || !tel) return;
+  const c = await confChatWeb();
+  if ('error' in c || (e.inbox?.id ?? e.conversation?.inbox_id) !== c.inbox) return;
+  await notificarChat(tel, e.content ?? null, e.attachments?.[0]?.file_type ?? null);
+}
 
 async function tokenValido(recibido: string | null) {
   if (!recibido) return false;
@@ -37,6 +51,7 @@ export async function POST(req: Request) {
       const [d] = await query<{ id: number; estado: string }>(sql`
         SELECT id, estado FROM bot_clima.campana_destinatarios WHERE chatwoot_message_id = ${e.id}`);
       if (d) await aplicarEstado(d.id, d.estado, e.status, e.content_attributes?.external_error ?? null);
+      await avisarChatWeb(e);
     } else if (e.event === 'message_created' && (e.message_type === 'incoming' || e.message_type === 0) && e.conversation?.id) {
       // Respuesta del contacto: se asigna a la última difusión que recibió en esa conversación (últimos 3 días)
       const [d] = await query<{ id: number }>(sql`

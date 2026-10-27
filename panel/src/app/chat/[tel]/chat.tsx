@@ -2,7 +2,17 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AdjuntoChat, BotonChat, MensajeChat } from '@/lib/chat-web';
+import { guardado, useAppWeb } from './app-web';
+import { type Accion, crearEstados, useEstadosVistos, VisorEstados } from './estados';
+import { Perfil } from './perfil';
+import { Bienvenida } from './bienvenida';
 import s from './chat.module.css';
+
+/** Cliente registrado en bot_clima.usuarios (para su radar en los estados) */
+export type Cliente = { id: number; nombre: string | null; lat: number | null; lon: number | null };
+
+const CLAVE_TUTORIAL = 'iagro-chat-tutorial-1';
+const CLAVE_BANNER = 'iagro-chat-banner-cerrado';
 
 type Pendiente = { clave: string; texto: string; hora: number; fallo: boolean };
 
@@ -10,7 +20,7 @@ type Pendiente = { clave: string; texto: string; hora: number; fallo: boolean };
 const CADA = { normal: 2500, esperando: 1200, oculta: 15000 };
 const ESPERA_RESPUESTA = 30_000;
 
-const hora = (t: number) => new Date(t).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
+const hora = (t: number) => new Date(t).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
 function dia(t: number) {
   const d = new Date(t);
@@ -71,7 +81,7 @@ function Adjunto({ a }: { a: AdjuntoChat }) {
   return <a className={s.archivo} href={a.url} target="_blank" rel="noopener noreferrer">📄 {a.nombre || 'Archivo'}</a>;
 }
 
-export function Chat({ telefono, firma }: { telefono: string; firma: string }) {
+export function Chat({ telefono, firma, cliente }: { telefono: string; firma: string; cliente: Cliente | null }) {
   const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
   const [cargado, setCargado] = useState(false);
@@ -82,6 +92,30 @@ export function Chat({ telefono, firma }: { telefono: string; firma: string }) {
   const [esperandoDesde, setEsperandoDesde] = useState<number | null>(null);
   const [texto, setTexto] = useState('');
   const [hoja, setHoja] = useState<{ titulo: string; botones: BotonChat[] } | null>(null);
+  const [perfil, setPerfil] = useState(false);
+  const [visor, setVisor] = useState<number | null>(null);
+  const [tutorial, setTutorial] = useState(false);
+  const [ayudaIOS, setAyudaIOS] = useState(false);
+  const [bannerCerrado, setBannerCerrado] = useState(true);
+
+  const app = useAppWeb(telefono, firma);
+  const hoy = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
+  const estados = useMemo(() => crearEstados({
+    hoy, radarId: cliente?.id ?? null, lat: cliente?.lat ?? null, lon: cliente?.lon ?? null, nombre: cliente?.nombre ?? null,
+    notificacionesActivas: app.permiso === 'granted' || app.permiso === 'no-soportado',
+  }), [hoy, cliente, app.permiso]);
+  const vistos = useEstadosVistos(estados);
+  const cerrarVisor = useCallback(() => setVisor(null), []);
+
+  // Primera visita: mini tutorial (cuando ya se sabe si se puede instalar y si hay permiso). Luego, el aviso arriba del chat.
+  useEffect(() => {
+    if (!app.listo) return;
+    setBannerCerrado(guardado.leer(CLAVE_BANNER, true) === '1');
+    if (guardado.leer(CLAVE_TUTORIAL)) return;
+    const t = setTimeout(() => setTutorial(true), 600);
+    return () => clearTimeout(t);
+  }, [app.listo]);
+  const terminarTutorial = useCallback(() => { guardado.escribir(CLAVE_TUTORIAL, '1'); setTutorial(false); }, []);
 
   const lista = useRef<HTMLDivElement>(null);
   const caja = useRef<HTMLTextAreaElement>(null);
@@ -229,11 +263,42 @@ export function Chat({ telefono, firma }: { telefono: string; firma: string }) {
   };
 
   useEffect(() => {
-    if (!hoja) return;
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setHoja(null); };
+    if (!hoja && !ayudaIOS) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { setHoja(null); setAyudaIOS(false); } };
     window.addEventListener('keydown', esc);
     return () => window.removeEventListener('keydown', esc);
-  }, [hoja]);
+  }, [hoja, ayudaIOS]);
+
+  const instalar = useCallback(() => {
+    if (app.puedeInstalar) app.instalar();
+    else setAyudaIOS(true); // iPhone (o navegador sin aviso propio): instrucciones
+  }, [app]);
+
+  const ejecutar = useCallback((a: Accion) => {
+    if (a.tipo === 'enviar') enviar(a.texto);
+    else if (a.tipo === 'enlace') window.open(a.url, '_blank', 'noopener');
+    else if (a.tipo === 'notificaciones') app.activarNotificaciones();
+    else {
+      // Deja el texto en la caja con el cursor donde va el número («llovió | mm»)
+      setTexto(a.texto);
+      requestAnimationFrame(() => {
+        const el = caja.current;
+        if (!el) return;
+        el.focus();
+        const pos = a.texto.indexOf('  ') + 1 || a.texto.length;
+        el.setSelectionRange(pos, pos);
+      });
+    }
+  }, [enviar, app]);
+
+  // Aviso fijo arriba del chat hasta que active las notificaciones o instale la app (se puede cerrar por esta visita)
+  const banner = bannerCerrado ? null
+    : app.permiso === 'default' ? { texto: 'Activa las notificaciones para recibir las alertas de lluvia.', boton: 'Activar', accion: () => app.activarNotificaciones() }
+    : app.permiso === 'instalar-primero' ? { texto: 'Instala la app para recibir las alertas de lluvia en tu iPhone.', boton: 'Cómo', accion: () => setAyudaIOS(true) }
+    : app.permiso === 'denied' ? { texto: 'Notificaciones bloqueadas: toca el candado 🔒 junto a la dirección → Notificaciones → Permitir.', boton: null, accion: null }
+    : !app.instalada && app.puedeInstalar ? { texto: 'Instala IAGRO en tu celular y entra con un toque.', boton: 'Instalar', accion: instalar }
+    : null;
+  const cerrarBanner = () => { guardado.escribir(CLAVE_BANNER, '1', true); setBannerCerrado(true); };
 
   if (linkInvalido) {
     return (
@@ -252,14 +317,32 @@ export function Chat({ telefono, firma }: { telefono: string; firma: string }) {
   return (
     <div className={s.app}>
       <header className={s.cabecera}>
-        <img className={s.avatar} src="/img/logo.png" alt="" width={40} height={40} />
-        <div className={s.titulo}>
-          <strong>IAGRO Clima</strong>
+        <button
+          type="button"
+          className={`${s.anillo} ${vistos.sinVer ? s.anilloNuevo : ''}`}
+          onClick={() => setVisor(vistos.primero)}
+          aria-label={vistos.sinVer ? `Ver estados de IAGRO (${vistos.sinVer} nuevos)` : 'Ver estados de IAGRO'}
+        >
+          <img className={s.avatar} src="/img/app-96.png" alt="" width={40} height={40} />
+        </button>
+        <button type="button" className={s.titulo} onClick={() => setPerfil(true)}>
+          <strong>IAGRO Clima <span className={s.verificado} title="Cuenta de empresa">✓</span></strong>
           <span>{escribiendo ? 'escribiendo…' : 'en línea'}</span>
-        </div>
+        </button>
+        <button type="button" className={s.menu} onClick={() => setPerfil(true)} aria-label="Info. de la empresa">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2" fill="currentColor" /><circle cx="12" cy="12" r="2" fill="currentColor" /><circle cx="12" cy="19" r="2" fill="currentColor" /></svg>
+        </button>
       </header>
 
       {error && <div className={s.error} role="status">{error}</div>}
+      {banner && (
+        <div className={s.banner}>
+          <span className={s.bannerIcono}>{app.permiso === 'denied' ? '🔕' : banner.boton === 'Instalar' ? '📲' : '🔔'}</span>
+          <p>{banner.texto}</p>
+          {banner.boton && <button type="button" className={s.bannerBoton} onClick={banner.accion!}>{banner.boton}</button>}
+          <button type="button" className={s.bannerCerrar} onClick={cerrarBanner} aria-label="Cerrar aviso">✕</button>
+        </div>
+      )}
 
       <div className={s.lista} ref={lista} onScroll={alScroll}>
         <div className={s.contenido}>
@@ -285,6 +368,7 @@ export function Chat({ telefono, firma }: { telefono: string; firma: string }) {
                     <div className={`${s.burbuja} ${m.mio ? s.mia : s.suya} ${cola ? s.cola : ''} ${m.botones.length ? s.conBotones : ''}`}>
                       {m.adjuntos.map((a, i) => <Adjunto key={i} a={a} />)}
                       {m.texto && <span className={s.texto}>{formato(m.texto)}</span>}
+                      <span className={`${s.espacio} ${m.mio ? s.espacioMio : ''}`} />
                       <span className={s.meta}>
                         {hora(m.hora)}
                         {m.mio && <Ticks estado={m.estado === 'failed' ? 'fallo' : ultimaRespuesta > m.id ? 'leido' : 'enviado'} />}
@@ -325,6 +409,7 @@ export function Chat({ telefono, firma }: { telefono: string; firma: string }) {
                     title={p.fallo ? 'Toca para reintentar' : undefined}
                   >
                     <span className={s.texto}>{formato(p.texto)}</span>
+                    <span className={`${s.espacio} ${s.espacioMio}`} />
                     <span className={s.meta}>{hora(p.hora)}<Ticks estado={p.fallo ? 'fallo' : 'reloj'} /></span>
                   </button>
                   {p.fallo && <span className={s.reintentar}>No se envió · toca para reintentar</span>}
@@ -388,6 +473,51 @@ export function Chat({ telefono, firma }: { telefono: string; firma: string }) {
           </div>
         </div>
       )}
+
+      {ayudaIOS && (
+        <div className={`${s.fondoHoja} ${s.encima}`} onClick={() => setAyudaIOS(false)}>
+          <div className={s.hoja} role="dialog" aria-modal="true" aria-label="Instalar la app" onClick={(e) => e.stopPropagation()}>
+            <div className={s.hojaCabecera}>
+              <button type="button" className={s.cerrar} onClick={() => setAyudaIOS(false)} aria-label="Cerrar">✕</button>
+              <strong>Instalar IAGRO</strong>
+            </div>
+            <ol className={s.pasosIOS}>
+              {app.esIOS ? (
+                <>
+                  <li>Abre este enlace en <b>Safari</b>.</li>
+                  <li>Toca <b>Compartir</b> <span className={s.ios}>⬆︎</span> en la barra de abajo.</li>
+                  <li>Elige <b>«Agregar a inicio»</b> y toca <b>Agregar</b>.</li>
+                  <li>Abre IAGRO desde el ícono nuevo y activa las notificaciones.</li>
+                </>
+              ) : (
+                <>
+                  <li>Abre este enlace en <b>Chrome</b>.</li>
+                  <li>Toca el menú <b>⋮</b> arriba a la derecha.</li>
+                  <li>Elige <b>«Instalar app»</b> o <b>«Agregar a la pantalla principal»</b>.</li>
+                </>
+              )}
+            </ol>
+          </div>
+        </div>
+      )}
+
+      {perfil && (
+        <Perfil
+          telefono={telefono}
+          app={app}
+          radarId={cliente?.id ?? null}
+          sinVer={vistos.sinVer}
+          alCerrar={() => setPerfil(false)}
+          alVerEstados={() => setVisor(vistos.primero)}
+          alInstalar={instalar}
+        />
+      )}
+
+      {visor != null && (
+        <VisorEstados estados={estados} inicio={visor} alVer={vistos.marcar} alCerrar={cerrarVisor} alAccion={(a) => { setPerfil(false); ejecutar(a); }} />
+      )}
+
+      {tutorial && <Bienvenida app={app} alTerminar={terminarTutorial} alInstalarIOS={() => setAyudaIOS(true)} />}
     </div>
   );
 }

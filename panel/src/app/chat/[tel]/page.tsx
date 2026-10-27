@@ -1,15 +1,26 @@
 import type { Metadata } from 'next';
+import { query, sql } from '@/lib/db';
 import { confChatWeb, firmaValida } from '@/lib/chat-web';
-import { Chat } from './chat';
+import { Chat, type Cliente } from './chat';
 import s from './chat.module.css';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: { absolute: 'IAGRO · Chat' },
-  icons: { icon: '/img/logo.png' },
-  robots: { index: false, follow: false },
-};
+type Props = { params: Promise<{ tel: string }>; searchParams: Promise<{ k?: string }> };
+
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  const { tel } = await params;
+  const { k } = await searchParams;
+  return {
+    title: { absolute: 'IAGRO Clima' },
+    description: 'Pronóstico, radar y alertas de lluvia para tu campo.',
+    icons: { icon: '/img/app-192.png', apple: '/img/app-apple-180.png' },
+    robots: { index: false, follow: false },
+    // App instalable: el manifest es de este cliente (abre su propio chat)
+    manifest: firmaValida(tel, k) ? `/chat/${tel}/manifest.webmanifest?k=${encodeURIComponent(k!)}` : undefined,
+    appleWebApp: { capable: true, title: 'IAGRO', statusBarStyle: 'default' },
+  };
+}
 
 export const viewport = { themeColor: '#008069', interactiveWidget: 'resizes-content' };
 
@@ -23,9 +34,7 @@ function Aviso({ titulo, texto }: { titulo: string; texto: string }) {
   );
 }
 
-export default async function ChatPage({ params, searchParams }: {
-  params: Promise<{ tel: string }>; searchParams: Promise<{ k?: string }>;
-}) {
+export default async function ChatPage({ params, searchParams }: Props) {
   const { tel } = await params;
   const { k } = await searchParams;
   if (!firmaValida(tel, k)) {
@@ -35,5 +44,8 @@ export default async function ChatPage({ params, searchParams }: {
   if ('error' in c) {
     return <Aviso titulo="Chat no disponible" texto="El chat está en mantenimiento. Inténtalo más tarde." />;
   }
-  return <Chat telefono={tel} firma={k!} />;
+  // Cliente registrado: su radar personal en los estados de IAGRO
+  const [u] = await query<Cliente>(sql`
+    SELECT id, nombre, latitud AS lat, longitud AS lon FROM bot_clima.usuarios WHERE telefono = ${tel} LIMIT 1`);
+  return <Chat telefono={tel} firma={k!} cliente={u ?? null} />;
 }

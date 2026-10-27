@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import {
-  BellRingIcon, CloudRainIcon, CreditCardIcon, GlobeIcon, MegaphoneIcon, MessageSquareTextIcon, PlugIcon, WalletIcon,
+  BellRingIcon, CloudRainIcon, CreditCardIcon, GlobeIcon, MegaphoneIcon, MessageSquareTextIcon, PlugIcon, WalletIcon, WebhookIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { requerirSesion } from '@/lib/auth';
-import { listarConfig, listarPlanes, type ConfigFila } from '@/lib/datos-config';
+import { leerConfig, listarConfig, listarPlanes, type ConfigFila } from '@/lib/datos-config';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Encabezado } from '@/components/shell';
 import { FormGrupo } from '@/components/config/form-grupo';
@@ -30,7 +31,8 @@ const esDeDifusiones = (clave: string) => /^(difusion_|plantilla_difusion|n8n_)/
 
 export default async function ConfiguracionPage() {
   await requerirSesion();
-  const [config, planes] = await Promise.all([listarConfig(), listarPlanes()]);
+  const [config, planes, token, h] = await Promise.all([listarConfig(), listarPlanes(), leerConfig<string>('chatwoot_webhook_token'), headers()]);
+  const webhook = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('x-forwarded-host') ?? h.get('host')}/panel/api/chatwoot/webhook?token=${token ?? ''}`;
   const porGrupo = new Map<string, ConfigFila[]>();
   for (const f of config) {
     if (!MODULOS.difusiones && esDeDifusiones(f.clave)) continue;
@@ -62,20 +64,43 @@ export default async function ConfiguracionPage() {
           <CardContent><Planes planes={planes} /></CardContent>
         </Card>
 
-        {GRUPOS.slice(MODULOS.difusiones ? 2 : 1).map((g) => porGrupo.has(g.id) && <Grupo key={g.id} g={g} filas={porGrupo.get(g.id)!} />)}
+        {GRUPOS.slice(MODULOS.difusiones ? 2 : 1).map((g) => porGrupo.has(g.id) && (
+          <Grupo key={g.id} g={g} filas={porGrupo.get(g.id)!}>
+            {g.id === 'whatsapp' && <WebhookPanel url={webhook} />}
+          </Grupo>
+        ))}
       </div>
     </>
   );
 }
 
-function Grupo({ g, filas }: { g: (typeof GRUPOS)[number]; filas: ConfigFila[] }) {
+/** URL que Chatwoot llama en cada mensaje: notificaciones del chat web y estados de las difusiones */
+function WebhookPanel({ url }: { url: string }) {
+  return (
+    <details className="mt-6 rounded-xl border p-4 text-sm">
+      <summary className="flex cursor-pointer items-center gap-2 font-medium"><WebhookIcon className="size-4" /> Webhook del panel (notificaciones del chat web)</summary>
+      <div className="mt-3 grid gap-2 text-muted-foreground">
+        <p>Con este webhook, al cliente del chat web le llega una notificación cuando el bot o un agente le responde.</p>
+        <ol className="list-decimal space-y-1 pl-5">
+          <li>En Chatwoot: <strong>Configuración → Integraciones → Webhooks → Agregar</strong>.</li>
+          <li>Pega esta URL (con la dirección pública del sitio, ej. https://iagro360.xyz):
+            <code className="mt-1 block break-all rounded bg-muted px-2 py-1 text-foreground">{url}</code>
+          </li>
+          <li>Marca los eventos <strong>Mensaje creado</strong> y <strong>Mensaje actualizado</strong>.</li>
+        </ol>
+      </div>
+    </details>
+  );
+}
+
+function Grupo({ g, filas, children }: { g: (typeof GRUPOS)[number]; filas: ConfigFila[]; children?: React.ReactNode }) {
   return (
     <Card id={g.id} className="scroll-mt-20">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><g.icon className="size-4" /> {g.titulo}</CardTitle>
         <CardDescription>{g.descripcion}</CardDescription>
       </CardHeader>
-      <CardContent><FormGrupo grupo={g.id} filas={filas} /></CardContent>
+      <CardContent><FormGrupo grupo={g.id} filas={filas} />{children}</CardContent>
     </Card>
   );
 }

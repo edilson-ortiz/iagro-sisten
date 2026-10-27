@@ -46,6 +46,9 @@
   }
 }
 
+/* Sin esto (esta ruta no carga ningún reset) los botones quedaban más angostos que la burbuja */
+.app *, .app *::before, .app *::after, .aviso * { box-sizing: border-box; }
+
 .app {
   position: fixed;
   inset: 0;
@@ -74,15 +77,98 @@
   z-index: 2;
 }
 .avatar {
+  display: block;
   width: 40px;
   height: 40px;
   border-radius: 50%;
   object-fit: cover;
   background: #fff;
 }
-.titulo { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.titulo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .titulo strong { font-size: 16px; font-weight: 500; }
 .titulo span { font-size: 13px; opacity: 0.85; }
+.verificado {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: #25d366;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+.menu {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.menu svg { width: 22px; height: 22px; }
+
+/* Anillo de estados alrededor de la foto: verde = hay estados sin ver */
+.anillo {
+  flex-shrink: 0;
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  display: grid;
+}
+.anillo > img { border: 2px solid var(--cab); }
+.anilloNuevo {
+  background: conic-gradient(#25d366 0 30%, transparent 30% 33.3%, #25d366 33.3% 63.3%, transparent 63.3% 66.6%, #25d366 66.6% 96.6%, transparent 96.6%);
+}
+
+/* Aviso fijo (notificaciones / instalar) */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 14px;
+  background: var(--cifrado);
+  color: var(--texto);
+  font-size: 13.5px;
+  line-height: 1.35;
+  flex-shrink: 0;
+  box-shadow: var(--sombra);
+  z-index: 1;
+}
+.banner p { flex: 1; margin: 0; }
+.bannerIcono { font-size: 20px; }
+.bannerBoton {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 18px;
+  padding: 7px 14px;
+  background: var(--verde);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bannerCerrar { border: 0; background: none; color: var(--meta); font-size: 15px; padding: 4px; cursor: pointer; }
 
 .error {
   background: var(--error);
@@ -144,7 +230,7 @@
 .burbuja {
   position: relative;
   display: block;
-  padding: 6px 7px 8px 9px;
+  padding: 6px 7px 7px 9px;
   border-radius: 7.5px;
   box-shadow: var(--sombra);
   font: inherit;
@@ -179,19 +265,21 @@ button.burbuja { cursor: default; }
 .texto a:hover { text-decoration: underline; }
 .texto code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
 
-/* Hora y ticks: flotan a la derecha de la última línea, como en WhatsApp */
+/* Hora y ticks en la esquina inferior. El espacio invisible al final del texto les deja lugar en la
+   última línea cuando cabe: así "Hola" ocupa una sola línea, como en WhatsApp */
+.espacio { display: inline-block; width: 46px; height: 1px; vertical-align: middle; }
+.espacioMio { width: 66px; }
 .meta {
-  float: right;
+  position: absolute;
+  right: 7px;
+  bottom: 3px;
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  margin: 6px 0 -5px 10px;
   font-size: 11px;
   line-height: 15px;
   color: var(--meta);
   white-space: nowrap;
-  position: relative;
-  top: 2px;
 }
 .tick { width: 16px; height: 11px; color: var(--meta); }
 .tickLeido { color: var(--leido); }
@@ -231,8 +319,10 @@ button.burbuja { cursor: default; }
 .ubicacion span { display: block; font-size: 12px; color: var(--meta); }
 
 /* Botones bajo el mensaje (respuestas rápidas de WhatsApp) */
+/* Mensaje con botones: burbuja y botones forman una sola tarjeta del mismo ancho */
+.grupo:has(.botones) { width: min(78%, 360px); }
 .conBotones { border-bottom-left-radius: 0; border-bottom-right-radius: 0; width: 100%; }
-.botones { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.botones { display: flex; flex-direction: column; gap: 1px; width: 100%; }
 .boton {
   display: flex;
   align-items: center;
@@ -335,6 +425,7 @@ button.burbuja { cursor: default; }
 .enviar:disabled { opacity: 0.55; cursor: default; }
 
 /* ---------- Lista de opciones (hoja inferior) ---------- */
+.encima { z-index: 40 !important; }
 .fondoHoja {
   position: fixed;
   inset: 0;
@@ -413,4 +504,211 @@ button.burbuja { cursor: default; }
 @media (max-width: 600px) {
   .contenido { padding-left: 0; padding-right: 0; }
   .grupo { max-width: 85%; }
+  .grupo:has(.botones) { width: 85%; }
+}
+
+/* ---------- Pasos para instalar ---------- */
+.pasosIOS { margin: 0; padding: 16px 20px 24px 40px; font-size: 15px; line-height: 1.5; display: grid; gap: 10px; }
+.ios {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: rgba(0, 122, 255, 0.12);
+  color: #007aff;
+  font-weight: 700;
+}
+
+/* ---------- Mini tutorial (primera visita) ---------- */
+.tutorial {
+  width: 100%;
+  max-width: 440px;
+  background: var(--suya);
+  border-radius: 20px 20px 0 0;
+  padding: 18px 24px max(24px, env(safe-area-inset-bottom));
+  text-align: center;
+  animation: subir 0.25s ease-out;
+}
+@media (min-width: 600px) {
+  .tutorial { align-self: center; border-radius: 20px; }
+}
+.tutorial h2 { margin: 10px 0 8px; font-size: 21px; font-weight: 600; }
+.tutorial p { margin: 0 0 16px; color: var(--meta); font-size: 15px; line-height: 1.5; }
+.tutorial p b { color: var(--texto); }
+.tutorialPuntos { display: flex; justify-content: center; gap: 6px; margin-bottom: 10px; }
+.tutorialPuntos i { width: 7px; height: 7px; border-radius: 50%; background: var(--meta); opacity: 0.35; transition: all 0.2s; }
+.tutorialPuntos i.puntoActivo { width: 20px; border-radius: 4px; background: var(--verde); opacity: 1; }
+.tutorialLogo { border-radius: 50%; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12); }
+.tutorialIcono {
+  width: 88px;
+  height: 88px;
+  margin: 4px auto 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 44px;
+  background: rgba(0, 168, 132, 0.12);
+}
+.tutorialLista { list-style: none; margin: 0 0 20px; padding: 0; text-align: left; display: grid; gap: 10px; font-size: 14.5px; line-height: 1.4; }
+.tutorialLista li { display: flex; gap: 12px; align-items: flex-start; }
+.tutorialLista span { flex-shrink: 0; width: 26px; text-align: center; font-size: 18px; }
+.tutorialBoton {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--verde);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tutorialBoton:disabled { opacity: 0.6; }
+.tutorialLuego {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px;
+  border: 0;
+  background: none;
+  color: var(--verde);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* ---------- Perfil de IAGRO ---------- */
+.perfil {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: var(--barra);
+  animation: entrar 0.2s ease-out;
+}
+@keyframes entrar { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.perfilCabecera {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 60px;
+  padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: var(--cab);
+  color: var(--cab-texto);
+  font-size: 17px;
+  font-weight: 500;
+}
+.perfilCabecera button { border: 0; background: none; color: inherit; width: 40px; height: 40px; display: grid; place-items: center; cursor: pointer; }
+.perfilCabecera svg { width: 24px; height: 24px; }
+.perfilScroll { flex: 1; overflow-y: auto; padding-bottom: 24px; }
+.perfilTarjeta {
+  max-width: 640px;
+  margin: 0 auto 10px;
+  background: var(--suya);
+  padding: 20px;
+  box-shadow: var(--sombra);
+  text-align: center;
+}
+.perfilTarjeta:first-child { padding-top: 28px; }
+.perfilTarjeta h2 { margin: 14px 0 2px; font-size: 22px; font-weight: 500; }
+.perfilTarjeta > p { margin: 0; color: var(--meta); font-size: 14.5px; }
+.anilloGrande { padding: 3px; margin: 0 auto; }
+.anilloGrande > img { width: 120px; height: 120px; border-radius: 50%; border: 3px solid var(--suya); display: block; }
+.perfilAcciones { display: flex; justify-content: center; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+.perfilAcciones > * {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 92px;
+  padding: 12px 10px;
+  border: 1px solid rgba(134, 150, 160, 0.3);
+  border-radius: 12px;
+  background: none;
+  color: var(--verde);
+  font: inherit;
+  font-size: 13.5px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.perfilAcciones span { font-size: 20px; line-height: 1; }
+.perfilTarjeta > .perfilInfo { text-align: left; color: var(--texto); line-height: 1.5; margin: 0 0 12px; }
+.perfilDatos { margin: 0; display: grid; gap: 10px; text-align: left; font-size: 14.5px; }
+.perfilDatos div { display: flex; gap: 14px; }
+.perfilDatos dd { margin: 0; }
+.perfilDatos a { color: var(--enlace); text-decoration: none; }
+.perfilFila {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+div.perfilFila, .perfilFila:disabled { cursor: default; }
+.perfilFila + .perfilFila { border-top: 1px solid rgba(134, 150, 160, 0.15); }
+.perfilFila strong { display: block; font-weight: 400; font-size: 15.5px; }
+.perfilFila small { display: block; color: var(--meta); font-size: 13px; margin-top: 2px; }
+.perfilIcono { width: 28px; text-align: center; font-size: 20px; }
+
+/* ---------- Visor de estados ---------- */
+.visor {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: #000;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  animation: aparecer 0.15s ease-out;
+}
+.visorBarras { display: flex; gap: 4px; padding: 8px 8px 0; padding-top: max(8px, env(safe-area-inset-top)); max-width: 560px; width: 100%; margin: 0 auto; }
+.visorBarras span { flex: 1; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.35); overflow: hidden; }
+.visorBarras i { display: block; height: 100%; background: #fff; }
+.visorCabecera { display: flex; align-items: center; gap: 10px; padding: 10px 12px; max-width: 560px; width: 100%; margin: 0 auto; }
+.visorCabecera img { border-radius: 50%; background: #fff; }
+.visorCabecera div { flex: 1; display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+.visorCabecera strong { font-size: 15px; font-weight: 500; }
+.visorCabecera span { font-size: 12.5px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.visorCabecera button { border: 0; background: none; color: #fff; font-size: 20px; width: 40px; height: 40px; cursor: pointer; }
+.visorCuerpo { position: relative; flex: 1; display: flex; max-width: 560px; width: 100%; margin: 0 auto; }
+.visorMapa { position: relative; flex: 1; border: 0; width: 100%; background: transparent; }
+.visorCargando { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, 0.7); font-size: 15px; background: #0b141a; }
+.visorTexto {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 32px;
+  text-align: center;
+  user-select: none;
+}
+.visorTexto h2 { margin: 0 0 14px; font-size: 30px; line-height: 1.2; font-weight: 600; }
+.visorTexto p { margin: 0; font-size: 19px; line-height: 1.45; white-space: pre-line; opacity: 0.95; }
+.zona { position: absolute; top: 0; bottom: 0; width: 30%; border: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.zonaIzq { left: 0; }
+.zonaDer { right: 0; }
+.zonaAngosta { width: 14%; }
+.visorPie { display: flex; justify-content: center; padding: 14px 16px max(18px, env(safe-area-inset-bottom)); }
+.visorPie button {
+  min-width: 220px;
+  min-height: 46px;
+  border: 0;
+  border-radius: 23px;
+  background: #fff;
+  color: #111b21;
+  font: inherit;
+  font-size: 15.5px;
+  font-weight: 600;
+  cursor: pointer;
 }
