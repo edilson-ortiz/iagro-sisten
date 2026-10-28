@@ -1,16 +1,20 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { compartir, IconoCompartir, useArchivo } from './compartir';
 import s from './chat.module.css';
 
 /**
  * Imagen a pantalla completa (como WhatsApp): zoom con dos dedos, doble toque o la rueda del mouse,
- * arrastrar para moverla con zoom, y botón para descargarla.
+ * arrastrar para moverla con zoom, y botones para compartirla (↪, con el texto del mensaje) y descargarla.
  */
 const MAX = 5;
 const limitar = (v: number) => Math.min(MAX, Math.max(1, v));
 
-export function VisorImagen({ url, descarga, fecha, alCerrar }: { url: string; descarga: string; fecha: string; alCerrar: () => void }) {
+export function VisorImagen({ url, descarga, texto, fecha, alCerrar }: {
+  url: string; descarga: string; texto: string | null; fecha: string; alCerrar: () => void;
+}) {
+  const { ref: refCompartir, archivo } = useArchivo(descarga);
   const [t, setT] = useState({ s: 1, x: 0, y: 0 });
   const [cargada, setCargada] = useState(false);
   const area = useRef<HTMLDivElement>(null);
@@ -85,6 +89,9 @@ export function VisorImagen({ url, descarga, fecha, alCerrar }: { url: string; d
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" fill="currentColor" /></svg>
         </button>
         <div><strong>IAGRO Clima</strong><span>{fecha}</span></div>
+        <button ref={refCompartir} type="button" onClick={() => compartir(texto, archivo)} aria-label="Compartir" title="Compartir con WhatsApp u otra app">
+          <IconoCompartir />
+        </button>
         <a href={descarga} download aria-label="Descargar imagen" title="Descargar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zm7-3 6-6-1.4-1.4-3.6 3.6V3h-2v10.2L7.4 9.6 6 11l6 6z" fill="currentColor" /></svg>
         </a>

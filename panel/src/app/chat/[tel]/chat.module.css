@@ -597,6 +597,26 @@ button.burbuja { cursor: default; }
 .botones .boton { border-radius: 0; }
 .botones .boton:last-child { border-bottom-left-radius: 7.5px; border-bottom-right-radius: 7.5px; }
 
+/* ↪ Compartir al costado de la burbuja (como el botón de reenviar de WhatsApp) */
+.compartir {
+  flex-shrink: 0;
+  align-self: center;
+  width: 34px;
+  height: 34px;
+  margin-left: 8px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--suya);
+  color: var(--meta);
+  box-shadow: var(--sombra);
+  cursor: pointer;
+}
+.compartir:hover { color: var(--verde); }
+.compartir:disabled { opacity: 0.6; }
+.compartir svg { width: 18px; height: 18px; }
+
 /* Indicador "escribiendo…" */
 .puntos { display: flex; gap: 4px; align-items: center; padding: 12px 14px; min-width: 0; }
 .puntos i {

@@ -8,6 +8,7 @@ import { Perfil } from './perfil';
 import { Bienvenida } from './bienvenida';
 import { leerUbicacion, MiUbicacion, SelectorUbicacion, TarjetaUbicacion, textoUbicacion, type Ubicacion } from './ubicacion';
 import { VisorImagen } from './visor-imagen';
+import { BotonCompartir } from './compartir';
 import s from './chat.module.css';
 
 /** Cliente registrado en bot_clima.usuarios (para su radar en los estados) */
@@ -21,6 +22,9 @@ type Pendiente = { clave: string; texto: string; hora: number; fallo: boolean };
 // Cada cuánto se buscan mensajes nuevos (ms): rápido mientras el bot responde, lento con la pestaña oculta
 const CADA = { normal: 2500, esperando: 1200, oculta: 15000 };
 const ESPERA_RESPUESTA = 30_000;
+
+/** Primera imagen adjunta del mensaje (la que se comparte con ↪) */
+const imagenDe = (m: MensajeChat) => m.adjuntos.find((a) => a.tipo === 'image' && a.url)?.url ?? null;
 
 const hora = (t: number) => new Date(t).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
@@ -102,7 +106,7 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
   const [bannerCerrado, setBannerCerrado] = useState(true);
   const [selector, setSelector] = useState(false);
   const [miUbicacion, setMiUbicacion] = useState(false);
-  const [imagen, setImagen] = useState<{ url: string; hora: number } | null>(null);
+  const [imagen, setImagen] = useState<{ url: string; hora: number; texto: string | null } | null>(null);
   // El mapa del selector arranca en el campo del cliente (si está registrado) mientras llega el GPS
   const inicioMapa = useMemo(
     () => (cliente?.lat != null && cliente?.lon != null ? { lat: cliente.lat, lon: cliente.lon } : null),
@@ -135,6 +139,8 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
   const primeraCarga = useRef(false);
 
   const url = `/chat/${telefono}/mensajes`;
+  /** Adjunto de Chatwoot pasado por el panel (para descargarlo o compartirlo) */
+  const descarga = (archivo: string) => `/chat/${telefono}/archivo?k=${encodeURIComponent(firma)}&url=${encodeURIComponent(archivo)}`;
 
   const unir = useCallback((nuevos: MensajeChat[]) => {
     if (!nuevos.length) return;
@@ -382,7 +388,7 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
                 <div className={`${s.fila} ${m.mio ? s.filaMia : ''} ${cola ? s.conCola : ''}`}>
                   <div className={s.grupo}>
                     <div className={`${s.burbuja} ${m.mio ? s.mia : s.suya} ${cola ? s.cola : ''} ${m.botones.length ? s.conBotones : ''} ${media ? s.conMedia : ''}`}>
-                      {m.adjuntos.map((a, i) => <Adjunto key={i} a={a} alAbrir={(url) => setImagen({ url, hora: m.hora })} />)}
+                      {m.adjuntos.map((a, i) => <Adjunto key={i} a={a} alAbrir={(url) => setImagen({ url, hora: m.hora, texto: m.texto })} />)}
                       {ubic ? <TarjetaUbicacion u={ubic} /> : m.texto && <span className={s.texto}>{formato(m.texto)}</span>}
                       <span className={`${s.espacio} ${m.mio ? s.espacioMio : ''}`} />
                       <span className={s.meta}>
@@ -407,6 +413,10 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
                       )
                     )}
                   </div>
+                  {/* ↪ Compartir (como en WhatsApp): mensajes del bot con imagen o enlace, ej. la invitación */}
+                  {!m.mio && !ubic && (imagenDe(m) || /https?:\/\//.test(m.texto ?? '')) && (
+                    <BotonCompartir texto={m.texto} imagen={imagenDe(m) ? descarga(imagenDe(m)!) : null} />
+                  )}
                 </div>
               </Fragment>
             );
@@ -559,7 +569,8 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
         <VisorImagen
           url={imagen.url}
           fecha={`${dia(imagen.hora)} ${hora(imagen.hora)}`}
-          descarga={`/chat/${telefono}/archivo?k=${encodeURIComponent(firma)}&url=${encodeURIComponent(imagen.url)}`}
+          descarga={descarga(imagen.url)}
+          texto={imagen.texto}
           alCerrar={() => setImagen(null)}
         />
       )}
