@@ -6,7 +6,7 @@ import s from './chat.module.css';
 
 export const dynamic = 'force-dynamic';
 
-type Props = { params: Promise<{ tel: string }>; searchParams: Promise<{ k?: string }> };
+type Props = { params: Promise<{ tel: string }>; searchParams: Promise<{ k?: string; r?: string }> };
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { tel } = await params;
@@ -36,7 +36,7 @@ function Aviso({ titulo, texto }: { titulo: string; texto: string }) {
 
 export default async function ChatPage({ params, searchParams }: Props) {
   const { tel } = await params;
-  const { k } = await searchParams;
+  const { k, r } = await searchParams;
   if (!firmaValida(tel, k)) {
     return <Aviso titulo="Enlace no válido" texto="Pide a IAGRO que te envíe de nuevo el enlace de tu chat." />;
   }
@@ -47,5 +47,7 @@ export default async function ChatPage({ params, searchParams }: Props) {
   // Cliente registrado: su radar personal en los estados de IAGRO
   const [u] = await query<Cliente>(sql`
     SELECT id, nombre, latitud AS lat, longitud AS lon FROM bot_clima.usuarios WHERE telefono = ${tel} LIMIT 1`);
-  return <Chat telefono={tel} firma={k!} cliente={u ?? null} />;
+  // r = código de invitación de un amigo (llegó por WhatsApp → botón "Ver pronóstico")
+  const invitacion = r && /^[a-z0-9]{4,8}$/i.test(r) ? r.toUpperCase() : null;
+  return <Chat telefono={tel} firma={k!} cliente={u ?? null} invitacion={invitacion} />;
 }

@@ -88,7 +88,9 @@ function Adjunto({ a, alAbrir }: { a: AdjuntoChat; alAbrir: (url: string) => voi
   return <a className={s.archivo} href={a.url} target="_blank" rel="noopener noreferrer">📄 {a.nombre || 'Archivo'}</a>;
 }
 
-export function Chat({ telefono, firma, cliente }: { telefono: string; firma: string; cliente: Cliente | null }) {
+export function Chat({ telefono, firma, cliente, invitacion = null }: {
+  telefono: string; firma: string; cliente: Cliente | null; invitacion?: string | null;
+}) {
   const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
   const [cargado, setCargado] = useState(false);
@@ -249,6 +251,18 @@ export function Chat({ telefono, firma, cliente }: { telefono: string; firma: st
       setError((e as Error).message === 'Failed to fetch' ? 'Sin conexión. Toca el mensaje para reintentar.' : (e as Error).message);
     }
   }, [url, firma, unir]);
+
+  // Llegó por la invitación de un amigo (WhatsApp → botón "Ver pronóstico" con ?r=CÓDIGO): el chat le pasa
+  // el código al bot como el mensaje de la invitación, para que el amigo que invitó sume. Una sola vez y
+  // solo si todavía no escribió en el chat web.
+  useEffect(() => {
+    if (!invitacion || !cargado) return;
+    const clave = `iagro-invitacion-${invitacion}`;
+    if (guardado.leer(clave)) return;
+    guardado.escribir(clave, '1');
+    if (mensajes.some((m) => m.mio)) return;
+    enviar(`Quiero alertas IAgro ${invitacion}`);
+  }, [invitacion, cargado]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const alEnviar = (e?: React.FormEvent) => {
     e?.preventDefault();
