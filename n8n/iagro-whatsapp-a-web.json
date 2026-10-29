@@ -3,19 +3,19 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## 📲 IAGRO · WhatsApp → Chat web\nCualquier mensaje que el cliente escribe por **WhatsApp** se responde con la plantilla **\"Ver pronóstico\"**. Su botón abre **https://iagro360.xyz/l/{código}**: el chat web personal de ese número, donde atiende el bot completo.\n\n- Una vez cada **30 min** por número como máximo (si escribe varios mensajes seguidos, recibe una sola).\n- No responde a los botones de las alertas (\"Dejar de recibir\", \"ALTA\"…): esos los atiende *Seguimiento de estados*.\n- No interrumpe si un agente atiende el chat (etiqueta `humano`, o asignado y abierto en las últimas 6 h).\n\n⚙️ Nombre de la plantilla: panel → Configuración → WhatsApp y Chatwoot → *Plantilla \"Ver pronóstico\"*.\n🔗 Webhook: en Chatwoot → Integraciones → Webhooks, la URL de producción del nodo **Webhook** con el evento *Mensaje creado*.",
-        "height": 380,
-        "width": 620,
+        "content": "## 📲 IAGRO · WhatsApp → Chat web\nCualquier mensaje que el cliente escribe por **WhatsApp** se responde con un **mensaje de servicio** (no es plantilla) con el botón **\"Ver pronóstico\"**. El botón abre **https://iagro360.xyz/l/{código}**: el chat web personal de ese número, donde atiende el bot completo.\n\n- El botón va directo a la **API de WhatsApp** (Chatwoot no envía botones de enlace), con el token y el número del inbox de WhatsApp de Chatwoot. En Chatwoot queda una **nota privada**.\n- Si Meta lo rechaza o faltan esos datos, se envía el mismo texto **con el enlace** por Chatwoot.\n- Una vez cada **30 min** por número como máximo (si escribe varios mensajes seguidos, recibe uno solo).\n- No responde a los botones de las alertas (\"Dejar de recibir\", \"ALTA\"…) ni si un agente atiende el chat.\n\n🔗 Webhook: en Chatwoot → Integraciones → Webhooks, la URL de producción del nodo **Webhook** con el evento *Mensaje creado*.",
+        "height": 420,
+        "width": 700,
         "color": 4
       },
-      "id": "b1a0e1c2-0001-4a00-9000-000000000001",
       "name": "Nota",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
         -120,
-        -460
-      ]
+        -500
+      ],
+      "id": "b1a0e1c2-0001-4a00-9000-000000000001"
     },
     {
       "parameters": {
@@ -23,7 +23,6 @@
         "path": "d96f94b5-34e2-499b-8966-8cd6cc8c1b91",
         "options": {}
       },
-      "id": "b1a0e1c2-0002-4a00-9000-000000000002",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
@@ -31,20 +30,21 @@
         0,
         0
       ],
-      "webhookId": "d96f94b5-34e2-499b-8966-8cd6cc8c1b91"
+      "webhookId": "d96f94b5-34e2-499b-8966-8cd6cc8c1b91",
+      "id": "b1a0e1c2-0002-4a00-9000-000000000002"
     },
     {
       "parameters": {
         "jsCode": "// Solo lo que el cliente escribe por WhatsApp. El chat web (inbox API) lo atiende el bot \"Iagro bot\".\nconst b = $json.body || {};\nconst conv = b.conversation || {};\nif (b.event !== 'message_created' || b.message_type !== 'incoming' || b.private === true) return [];\nif (conv.channel !== 'Channel::Whatsapp') return [];\n\n// Botones de la plantilla de alertas (\"Dejar de recibir\", \"ALTA\"…): los atiende \"IAGRO · Seguimiento de estados\"\nconst t = String(b.content || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/^[^a-z0-9]+/, '').trim();\nif (/^(dejar de recibir|no recibir alertas|desactivar alertas|activar alertas|recibir alertas|alta|solo lluvias fuertes|lluvias fuertes)$/.test(t)) return [];\n\n// Un agente atiende el chat en Chatwoot (misma regla que el bot): etiqueta \"humano\",\n// o asignado a un agente que lo abrió en las últimas 6 h\nconst etiquetas = (conv.labels || []).map((x) => String(x).toLowerCase());\nconst vistoAgente = Number(conv.agent_last_seen_at || 0) * 1000;\nif (etiquetas.includes('humano')) return [];\nif (conv.meta?.assignee && vistoAgente > Date.now() - 6 * 3600 * 1000) return [];\n\nconst sender = conv.meta?.sender || b.sender || {};\nconst telefono = String(sender.phone_number || '').replace(/\\D/g, '');\nif (telefono.length < 8 || !conv.id) return [];\nreturn [{ json: { telefono, conversation_id: conv.id, nombre_whatsapp: String(sender.name || '').trim() } }];"
       },
-      "id": "b1a0e1c2-0003-4a00-9000-000000000003",
       "name": "Solo WhatsApp entrante",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         220,
         0
-      ]
+      ],
+      "id": "b1a0e1c2-0003-4a00-9000-000000000003"
     },
     {
       "parameters": {
@@ -52,7 +52,6 @@
         "query": "SELECT bot_clima.config_json() AS cfg",
         "options": {}
       },
-      "id": "b1a0e1c2-0004-4a00-9000-000000000004",
       "name": "Configuración",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
@@ -65,7 +64,8 @@
           "id": "3rBndDAmfD2YkJwN",
           "name": "Postgres account"
         }
-      }
+      },
+      "id": "b1a0e1c2-0004-4a00-9000-000000000004"
     },
     {
       "parameters": {
@@ -75,7 +75,6 @@
           "queryReplacement": "={{ [ $('Solo WhatsApp entrante').first().json.telefono ] }}"
         }
       },
-      "id": "b1a0e1c2-0005-4a00-9000-000000000005",
       "name": "Enlace del chat web",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
@@ -88,36 +87,32 @@
           "id": "3rBndDAmfD2YkJwN",
           "name": "Postgres account"
         }
-      }
+      },
+      "id": "b1a0e1c2-0005-4a00-9000-000000000005"
     },
     {
       "parameters": {
-        "jsCode": "// Plantilla \"Ver pronóstico\": {{1}} del cuerpo = nombre; {{1}} del botón = código de https://iagro360.xyz/l/{{1}}\nconst d = $('Solo WhatsApp entrante').first().json;\nconst cfg = $('Configuración').first().json.cfg || {};\nconst r = $json;\nif (!r.enviar || !r.enlace) return [];   // ya se la mandamos hace menos de 30 min: no se repite\n\n// WhatsApp no acepta saltos de línea ni más de 4 espacios seguidos en las variables\nconst limpiar = (v) => String(v ?? '').replace(/[\\r\\n\\t]+/g, ' ').replace(/ {4,}/g, '   ').trim();\n// Nombre del perfil de WhatsApp (si no es solo un número); si no, el registrado en el panel\nconst deWhatsapp = /[a-záéíóúñ]/i.test(d.nombre_whatsapp) ? d.nombre_whatsapp : '';\nconst nombre = limpiar(deWhatsapp || r.nombre_cliente || 'productor').slice(0, 60);\n\nconst base = String(cfg.chatwoot_url_publica || '').replace(/\\/+$/, '') + '/api/v1/accounts/' + cfg.chatwoot_account_id;\nreturn [{ json: {\n  url: base + '/conversations/' + d.conversation_id + '/messages',\n  payload: {\n    // Texto que se ve en Chatwoot; a WhatsApp va la plantilla aprobada\n    content: 'Hola ' + nombre + ',\\n\\nTu pronóstico de IAGRO 360 está listo.\\n\\nToca el botón para ver tu pronóstico actualizado, alertas y lluvia acumulada de tu zona.',\n    message_type: 'outgoing',\n    private: false,\n    template_params: {\n      name: cfg.plantilla_chat_web || 'pronostico_web',\n      category: 'UTILITY',\n      language: cfg.plantilla_idioma || 'es',\n      processed_params: {\n        body: { '1': nombre },\n        buttons: [{ type: 'url', parameter: r.enlace }],\n      },\n    },\n  },\n} }];"
+        "jsCode": "// Texto y enlace personal del mensaje \"Ver pronóstico\"\nconst d = $('Solo WhatsApp entrante').first().json;\nconst cfg = $('Configuración').first().json.cfg || {};\nconst r = $json;\nif (!r.enviar || !r.enlace) return [];   // ya se lo mandamos hace menos de 30 min: no se repite\n\n// Nombre del perfil de WhatsApp (si no es solo un número); si no, el registrado en el panel\nconst deWhatsapp = /[a-záéíóúñ]/i.test(d.nombre_whatsapp) ? d.nombre_whatsapp : '';\nconst nombre = String(deWhatsapp || r.nombre_cliente || 'productor').replace(/\\s+/g, ' ').trim().slice(0, 60);\n\nreturn [{ json: {\n  base: String(cfg.chatwoot_url_publica || '').replace(/\\/+$/, '') + '/api/v1/accounts/' + cfg.chatwoot_account_id,\n  inbox: Number(cfg.chatwoot_inbox_id || 0),\n  conversation_id: d.conversation_id,\n  telefono: d.telefono,\n  url: 'https://iagro360.xyz/l/' + r.enlace,\n  texto: 'Hola ' + nombre + ',\\n\\nTu pronóstico de IAGRO 360 está listo.\\n\\nToca el botón para ver tu pronóstico actualizado, alertas y lluvia acumulada de tu zona.',\n} }];"
       },
-      "id": "b1a0e1c2-0006-4a00-9000-000000000006",
-      "name": "Armar plantilla",
+      "name": "Preparar",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         880,
         0
-      ]
+      ],
+      "id": "b1a0e1c2-0006-4a00-9000-000000000006"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ $json.url }}",
+        "url": "={{ $json.base }}/inboxes/{{ $json.inbox }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.payload) }}",
         "options": {
           "timeout": 20000
         }
       },
-      "id": "b1a0e1c2-0007-4a00-9000-000000000007",
-      "name": "Enviar plantilla",
+      "name": "Datos del inbox",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
@@ -129,7 +124,142 @@
           "id": "3XgXgRqlWDyWhTB9",
           "name": "Header Auth account"
         }
-      }
+      },
+      "onError": "continueErrorOutput",
+      "id": "b1a0e1c2-0007-4a00-9000-000000000007"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mensaje de servicio con botón de enlace (interactive \"cta_url\" de la API de WhatsApp Cloud).\n// Va directo a Meta: Chatwoot no envía botones de enlace. Es gratis dentro de las 24 h después\n// de que el cliente escribió. El token y el número salen del inbox de WhatsApp de Chatwoot.\nconst p = $('Preparar').first().json;\nconst pc = $json.provider_config || {};\nif (!pc.api_key || !pc.phone_number_id) return [{ json: { ...p, meta: null } }];   // → texto con el enlace\nreturn [{ json: { ...p, meta: {\n  url: 'https://graph.facebook.com/v24.0/' + pc.phone_number_id + '/messages',\n  token: pc.api_key,\n  cuerpo: {\n    messaging_product: 'whatsapp',\n    recipient_type: 'individual',\n    to: p.telefono,\n    type: 'interactive',\n    interactive: {\n      type: 'cta_url',\n      body: { text: p.texto },\n      action: { name: 'cta_url', parameters: { display_text: 'Ver pronóstico', url: p.url } },\n    },\n  },\n} } }];"
+      },
+      "name": "Armar botón",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -100
+      ],
+      "id": "b1a0e1c2-0008-4a00-9000-000000000008"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-meta",
+              "leftValue": "={{ !!$json.meta }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "¿Datos de WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1540,
+        -100
+      ],
+      "id": "b1a0e1c2-0009-4a00-9000-000000000009"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.meta.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.meta.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.meta.cuerpo) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "Enviar botón (WhatsApp)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1760,
+        -200
+      ],
+      "onError": "continueErrorOutput",
+      "id": "b1a0e1c2-0010-4a00-9000-000000000010"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Preparar').first().json.base }}/conversations/{{ $('Preparar').first().json.conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: '📲 Botón \"Ver pronóstico\" enviado por WhatsApp → ' + $('Preparar').first().json.url, message_type: 'outgoing', private: true }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "Nota en Chatwoot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1980,
+        -260
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "b1a0e1c2-0011-4a00-9000-000000000011"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Preparar').first().json.base }}/conversations/{{ $('Preparar').first().json.conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $('Preparar').first().json.texto + '\\n\\n👉 Ver pronóstico: ' + $('Preparar').first().json.url, message_type: 'outgoing', private: false }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "Enviar enlace (texto)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1980,
+        60
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "b1a0e1c2-0012-4a00-9000-000000000012"
     }
   ],
   "pinData": {},
@@ -171,18 +301,83 @@
       "main": [
         [
           {
-            "node": "Armar plantilla",
+            "node": "Preparar",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Armar plantilla": {
+    "Preparar": {
       "main": [
         [
           {
-            "node": "Enviar plantilla",
+            "node": "Datos del inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos del inbox": {
+      "main": [
+        [
+          {
+            "node": "Armar botón",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar enlace (texto)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar botón": {
+      "main": [
+        [
+          {
+            "node": "¿Datos de WhatsApp?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Datos de WhatsApp?": {
+      "main": [
+        [
+          {
+            "node": "Enviar botón (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar enlace (texto)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar botón (WhatsApp)": {
+      "main": [
+        [
+          {
+            "node": "Nota en Chatwoot",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar enlace (texto)",
             "type": "main",
             "index": 0
           }
