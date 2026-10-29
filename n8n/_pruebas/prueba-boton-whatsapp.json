@@ -1,0 +1,130 @@
+{
+  "name": "IAGRO · Prueba botón WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 🧪 Prueba: botón \"Ver pronóstico\" por la API de WhatsApp\nEnvía un **mensaje de servicio con botón de enlace** directo a Meta, sin base de datos, sin Chatwoot y sin límite de 30 min.\n\n1. En **Datos de la prueba** pon tu número (con 591, sin +).\n2. **Importante:** ese número tiene que haberle escrito a tu WhatsApp de empresa en las **últimas 24 h** (si no, Meta lo rechaza: error 131047).\n3. Credencial **WhatsApp API** en el nodo de envío (Header Auth: `Authorization` = `Bearer <token>`).\n4. Toca **Execute workflow**. La respuesta de Meta queda en el nodo **Enviar botón**: `messages[0].id` = enviado; si no, el error.",
+        "height": 300,
+        "width": 620,
+        "color": 5
+      },
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -360
+      ],
+      "id": "c2b0f1d3-0001-4b00-9000-000000000001"
+    },
+    {
+      "parameters": {},
+      "name": "Probar",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c2b0f1d3-0002-4b00-9000-000000000002"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p1",
+              "name": "telefono",
+              "value": "59160901854",
+              "type": "string"
+            },
+            {
+              "id": "p2",
+              "name": "enlace",
+              "value": "https://iagro360.xyz",
+              "type": "string"
+            },
+            {
+              "id": "p3",
+              "name": "meta_url",
+              "value": "https://graph.facebook.com/v25.0/1356446567560317/messages",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Datos de la prueba",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "id": "c2b0f1d3-0003-4b00-9000-000000000003"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.meta_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: $json.telefono, type: 'interactive', interactive: { type: 'cta_url', body: { text: 'Hola,\\n\\nTu pronóstico de IAGRO 360 está listo.\\n\\nToca el botón para ver tu pronóstico actualizado, alertas y lluvia acumulada de tu zona.' }, action: { name: 'cta_url', parameters: { display_text: 'Ver pronóstico', url: $json.enlace } } } }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Enviar botón",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "WhatsApp API"
+        }
+      },
+      "id": "c2b0f1d3-0004-4b00-9000-000000000004"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Probar": {
+      "main": [
+        [
+          {
+            "node": "Datos de la prueba",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos de la prueba": {
+      "main": [
+        [
+          {
+            "node": "Enviar botón",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
