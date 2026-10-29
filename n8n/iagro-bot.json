@@ -45,6 +45,15 @@
                 "operation": "false",
                 "singleValue": true
               }
+            },
+            {
+              "id": "cond-no-whatsapp",
+              "leftValue": "={{ String($json.body.conversation?.channel ?? '') }}",
+              "rightValue": "Channel::Whatsapp",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
             }
           ],
           "combinator": "and"

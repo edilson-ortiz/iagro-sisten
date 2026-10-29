@@ -1,0 +1,198 @@
+{
+  "name": "IAGRO · WhatsApp → Chat web",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 📲 IAGRO · WhatsApp → Chat web\nCualquier mensaje que el cliente escribe por **WhatsApp** se responde con la plantilla **\"Ver pronóstico\"**. Su botón abre **https://iagro360.xyz/l/{código}**: el chat web personal de ese número, donde atiende el bot completo.\n\n- Una vez cada **30 min** por número como máximo (si escribe varios mensajes seguidos, recibe una sola).\n- No responde a los botones de las alertas (\"Dejar de recibir\", \"ALTA\"…): esos los atiende *Seguimiento de estados*.\n- No interrumpe si un agente atiende el chat (etiqueta `humano`, o asignado y abierto en las últimas 6 h).\n\n⚙️ Nombre de la plantilla: panel → Configuración → WhatsApp y Chatwoot → *Plantilla \"Ver pronóstico\"*.\n🔗 Webhook: en Chatwoot → Integraciones → Webhooks, la URL de producción del nodo **Webhook** con el evento *Mensaje creado*.",
+        "height": 380,
+        "width": 620,
+        "color": 4
+      },
+      "id": "b1a0e1c2-0001-4a00-9000-000000000001",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        -460
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "d96f94b5-34e2-499b-8966-8cd6cc8c1b91",
+        "options": {}
+      },
+      "id": "b1a0e1c2-0002-4a00-9000-000000000002",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "d96f94b5-34e2-499b-8966-8cd6cc8c1b91"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Solo lo que el cliente escribe por WhatsApp. El chat web (inbox API) lo atiende el bot \"Iagro bot\".\nconst b = $json.body || {};\nconst conv = b.conversation || {};\nif (b.event !== 'message_created' || b.message_type !== 'incoming' || b.private === true) return [];\nif (conv.channel !== 'Channel::Whatsapp') return [];\n\n// Botones de la plantilla de alertas (\"Dejar de recibir\", \"ALTA\"…): los atiende \"IAGRO · Seguimiento de estados\"\nconst t = String(b.content || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/^[^a-z0-9]+/, '').trim();\nif (/^(dejar de recibir|no recibir alertas|desactivar alertas|activar alertas|recibir alertas|alta|solo lluvias fuertes|lluvias fuertes)$/.test(t)) return [];\n\n// Un agente atiende el chat en Chatwoot (misma regla que el bot): etiqueta \"humano\",\n// o asignado a un agente que lo abrió en las últimas 6 h\nconst etiquetas = (conv.labels || []).map((x) => String(x).toLowerCase());\nconst vistoAgente = Number(conv.agent_last_seen_at || 0) * 1000;\nif (etiquetas.includes('humano')) return [];\nif (conv.meta?.assignee && vistoAgente > Date.now() - 6 * 3600 * 1000) return [];\n\nconst sender = conv.meta?.sender || b.sender || {};\nconst telefono = String(sender.phone_number || '').replace(/\\D/g, '');\nif (telefono.length < 8 || !conv.id) return [];\nreturn [{ json: { telefono, conversation_id: conv.id, nombre_whatsapp: String(sender.name || '').trim() } }];"
+      },
+      "id": "b1a0e1c2-0003-4a00-9000-000000000003",
+      "name": "Solo WhatsApp entrante",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.config_json() AS cfg",
+        "options": {}
+      },
+      "id": "b1a0e1c2-0004-4a00-9000-000000000004",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM bot_clima.derivar_a_web($1, 30)",
+        "options": {
+          "queryReplacement": "={{ [ $('Solo WhatsApp entrante').first().json.telefono ] }}"
+        }
+      },
+      "id": "b1a0e1c2-0005-4a00-9000-000000000005",
+      "name": "Enlace del chat web",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Plantilla \"Ver pronóstico\": {{1}} del cuerpo = nombre; {{1}} del botón = código de https://iagro360.xyz/l/{{1}}\nconst d = $('Solo WhatsApp entrante').first().json;\nconst cfg = $('Configuración').first().json.cfg || {};\nconst r = $json;\nif (!r.enviar || !r.enlace) return [];   // ya se la mandamos hace menos de 30 min: no se repite\n\n// WhatsApp no acepta saltos de línea ni más de 4 espacios seguidos en las variables\nconst limpiar = (v) => String(v ?? '').replace(/[\\r\\n\\t]+/g, ' ').replace(/ {4,}/g, '   ').trim();\n// Nombre del perfil de WhatsApp (si no es solo un número); si no, el registrado en el panel\nconst deWhatsapp = /[a-záéíóúñ]/i.test(d.nombre_whatsapp) ? d.nombre_whatsapp : '';\nconst nombre = limpiar(deWhatsapp || r.nombre_cliente || 'productor').slice(0, 60);\n\nconst base = String(cfg.chatwoot_url_publica || '').replace(/\\/+$/, '') + '/api/v1/accounts/' + cfg.chatwoot_account_id;\nreturn [{ json: {\n  url: base + '/conversations/' + d.conversation_id + '/messages',\n  payload: {\n    // Texto que se ve en Chatwoot; a WhatsApp va la plantilla aprobada\n    content: 'Hola ' + nombre + ',\\n\\nTu pronóstico de IAGRO 360 está listo.\\n\\nToca el botón para ver tu pronóstico actualizado, alertas y lluvia acumulada de tu zona.',\n    message_type: 'outgoing',\n    private: false,\n    template_params: {\n      name: cfg.plantilla_chat_web || 'pronostico_web',\n      category: 'UTILITY',\n      language: cfg.plantilla_idioma || 'es',\n      processed_params: {\n        body: { '1': nombre },\n        buttons: [{ type: 'url', parameter: r.enlace }],\n      },\n    },\n  },\n} }];"
+      },
+      "id": "b1a0e1c2-0006-4a00-9000-000000000006",
+      "name": "Armar plantilla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "b1a0e1c2-0007-4a00-9000-000000000007",
+      "name": "Enviar plantilla",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1100,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Solo WhatsApp entrante",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solo WhatsApp entrante": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Enlace del chat web",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enlace del chat web": {
+      "main": [
+        [
+          {
+            "node": "Armar plantilla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar plantilla": {
+      "main": [
+        [
+          {
+            "node": "Enviar plantilla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
