@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { firmaImagenValida, pronosticoWa, type ParamsImagen } from '@/lib/pronostico-wa';
-import { ALTO, ANCHO, ImagenPronostico } from './imagen-pronostico';
+import { recorteSatelital } from '@/lib/mapa-satelital';
+import { ALTO, ANCHO, ImagenPronostico, MAPA_ALTO, MAPA_ANCHO } from './imagen-pronostico';
 
 /**
  * Imagen del pronóstico (PNG) para el encabezado del mensaje del bot de WhatsApp.
@@ -20,9 +21,14 @@ export async function GET(req: Request) {
   const lat = Number(p.lat);
   const lon = Number(p.lon);
   try {
-    const dias = await pronosticoWa(lat, lon);
+    const general = p.general === '1';
+    // Mapa satelital real del lugar (zona de la ciudad si es el pronóstico general); si falla, mapa dibujado
+    const [dias, mosaico] = await Promise.all([
+      pronosticoWa(lat, lon),
+      recorteSatelital(lat, lon, general ? 11 : 15, MAPA_ANCHO, MAPA_ALTO).catch(() => null),
+    ]);
     return new ImageResponse(
-      <ImagenPronostico dias={dias} lugar={p.lugar || 'Tu ubicación'} general={p.general === '1'} lat={lat} lon={lon} />,
+      <ImagenPronostico dias={dias} lugar={p.lugar || 'Tu ubicación'} general={general} lat={lat} lon={lon} mosaico={mosaico} />,
       { width: ANCHO, height: ALTO, headers: { 'cache-control': 'public, max-age=1800' } },
     );
   } catch (err) {

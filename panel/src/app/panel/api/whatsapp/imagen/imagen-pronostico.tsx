@@ -1,4 +1,5 @@
 import type { DiaPronostico } from '@/lib/pronostico-wa';
+import type { Mosaico } from '@/lib/mapa-satelital';
 
 /**
  * Imagen del pronóstico de 7 días para el encabezado del mensaje de WhatsApp (next/og → PNG).
@@ -43,8 +44,49 @@ function Icono({ d }: { d: DiaPronostico }) {
   );
 }
 
-function Mapa({ general }: { general: boolean }) {
-  const pin = general ? '#7a8580' : '#e53935';
+export const MAPA_ANCHO = 260;
+export const MAPA_ALTO = 180;
+
+/** Pin rojo con borde blanco y sombra; la punta queda justo en (x, y) */
+function Pin({ x, y, color }: { x: number; y: number; color: string }) {
+  return (
+    <svg width="44" height="58" viewBox="0 0 44 58" style={{ position: 'absolute', left: x - 22, top: y - 56 }}>
+      <ellipse cx="22" cy="55" rx="9" ry="3" fill="rgba(0,0,0,0.35)" />
+      <path d="M22 54 C9 38 3 29 3 20 A19 19 0 0 1 41 20 C41 29 35 38 22 54Z" fill={color} stroke="#ffffff" strokeWidth="3.5" />
+      <circle cx="22" cy="20" r="7" fill="#ffffff" />
+    </svg>
+  );
+}
+
+/**
+ * Arriba a la izquierda: el lugar del pronóstico. Con mosaicos, mapa satelital real centrado en la ubicación
+ * con su pin; sin mosaicos (no se pudieron bajar), un mapa dibujado.
+ */
+function Mapa({ general, mosaico }: { general: boolean; mosaico: Mosaico[] | null }) {
+  const color = general ? '#7a8580' : '#e53935';
+  if (mosaico) {
+    return (
+      <div style={{
+        display: 'flex', position: 'relative', width: MAPA_ANCHO, height: MAPA_ALTO, overflow: 'hidden',
+        borderRadius: 16, border: '3px solid #ffffff', boxShadow: '0 2px 8px rgba(0,0,0,0.25)', flexShrink: 0,
+      }}>
+        {mosaico.map((t) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={`${t.left},${t.top}`} src={t.src} width={256} height={256} style={{ position: 'absolute', left: t.left, top: t.top }} alt="" />
+        ))}
+        {!general && <div style={{ display: 'flex', position: 'absolute', left: MAPA_ANCHO / 2 - 34, top: MAPA_ALTO / 2 - 34, width: 68, height: 68, borderRadius: 34, border: '3px solid rgba(255,255,255,0.85)', background: 'rgba(229,57,53,0.18)' }} />}
+        <Pin x={MAPA_ANCHO / 2} y={MAPA_ALTO / 2} color={color} />
+        <div style={{
+          display: 'flex', position: 'absolute', left: 8, bottom: 8, padding: '3px 10px', borderRadius: 12,
+          background: 'rgba(255,255,255,0.92)', color: general ? '#5e6b65' : '#c62828', fontSize: 16,
+        }}>
+          {general ? 'Santa Cruz' : 'Tu ubicación'}
+        </div>
+        <div style={{ display: 'flex', position: 'absolute', right: 6, bottom: 4, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Esri</div>
+      </div>
+    );
+  }
+  const pin = color;
   return (
     <svg width="150" height="130" viewBox="0 0 150 130">
       <rect width="150" height="130" rx="14" fill="#cfe3c4" />
@@ -58,8 +100,8 @@ function Mapa({ general }: { general: boolean }) {
   );
 }
 
-export function ImagenPronostico({ dias, lugar, general, lat, lon }: {
-  dias: DiaPronostico[]; lugar: string; general: boolean; lat: number; lon: number;
+export function ImagenPronostico({ dias, lugar, general, lat, lon, mosaico = null }: {
+  dias: DiaPronostico[]; lugar: string; general: boolean; lat: number; lon: number; mosaico?: Mosaico[] | null;
 }) {
   const semana = dias.slice(0, 7);
   const proxima = dias.find((d) => d.mm >= 1);
@@ -74,7 +116,7 @@ export function ImagenPronostico({ dias, lugar, general, lat, lon }: {
     <div style={{ width: ANCHO, height: ALTO, display: 'flex', flexDirection: 'column', background: '#f4f8f5', padding: 28, color: '#1d2622' }}>
       {/* Encabezado: dónde es el pronóstico */}
       <div style={{ display: 'flex', alignItems: 'center' }}>
-        <Mapa general={general} />
+        <Mapa general={general} mosaico={mosaico} />
         <div style={{ display: 'flex', flexDirection: 'column', marginLeft: 24, flex: 1 }}>
           <div style={{ display: 'flex', fontSize: 38, color: '#1d2622' }}>{lugar}</div>
           <div style={{ display: 'flex', fontSize: 20, color: '#5e6b65', marginTop: 2 }}>

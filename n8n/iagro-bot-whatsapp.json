@@ -48,19 +48,6 @@
     },
     {
       "parameters": {
-        "jsCode": "// Intención del mensaje, con reglas (sin IA). Los botones se reconocen por su título.\nconst m = $json;\nconst norm = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n  .replace(/[¿?¡!.,;:]/g, ' ').replace(/\\s+/g, ' ').trim();\nconst s = norm(m.texto);\nconst sinIcono = s.replace(/^[^a-z0-9]+/, '').trim();   // \"📡 ver radar\" → \"ver radar\"\nconst DIAS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];\nconst BOTONES = {\n  'mi ubicacion': 'PEDIR_UBICACION', 'enviar ubicacion': 'PEDIR_UBICACION', 'cambiar lote': 'PEDIR_UBICACION',\n  'ver radar': 'RADAR', 'actualizar radar': 'RADAR',\n  'manana': 'DIA', 'ver semana': 'SEMANA', 'actualizar': 'SEMANA', 'ver pronostico': 'SEMANA',\n};\n\nlet intent = 'SEMANA', dia = null, codigo = null;\nconst saludo = /^(hola|hla|ola|buenas|buenos dias|buen dia|buenas tardes|buenas noches|holi)\\b/.test(s);\nconst inv = s.match(/quiero alertas iagro\\s+([a-z0-9]{4,8})/);\n\nif (m.lat != null && m.lon != null) {\n  intent = 'UBICACION_RECIBIDA';\n} else if (inv) {\n  intent = 'INVITACION';\n  codigo = inv[1].toUpperCase();\n} else if (BOTONES[sinIcono]) {\n  intent = BOTONES[sinIcono];\n  if (intent === 'DIA') dia = 'manana';\n} else {\n  if (/\\bhoy\\b/.test(s)) dia = 'hoy';\n  else if (/\\b(manana|mnn|mñn)\\b/.test(s)) dia = 'manana';\n  else dia = DIAS.find((d) => s.includes(d)) || null;\n\n  if (/(fumig|riego|regar|plaga|precio|soya|vender|semilla|abono|insecticida|herbicida)/.test(s)) intent = 'FUERA';\n  else if (/(cambiar (mi |el )?(lote|ubicacion|parcela)|otro lado|otra parcela|mi ubicacion|enviar ubicacion)/.test(s)) intent = 'PEDIR_UBICACION';\n  else if (/(radar|donde .*llov|donde .*lluvia|ya viene|se acerca|ya llega|viene la lluvia)/.test(s)) intent = 'RADAR';\n  else if (/(llov|lluv|yuev|aguacero|chubasco|tormenta)/.test(s) && !dia) intent = 'LLUVIA';\n  else if (dia) intent = 'DIA';\n  else if (/^(gracias|grax|muchas gracias|oki|ok|okey|ya|listo|dale|bueno|perfecto|genial)\\b/.test(s) || /^[\\u{1F44D}\\u{1F64F}\\u{1F44C}\\u{1F60A}\\s]+$/u.test(String(m.texto).trim())) intent = 'GRACIAS';\n}\nreturn [{ json: { ...m, intent, dia, codigo, saludo } }];"
-      },
-      "name": "Intención",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        440,
-        0
-      ],
-      "id": "d4c2b1a0-0004-4c00-9000-000000000004"
-    },
-    {
-      "parameters": {
         "operation": "executeQuery",
         "query": "SELECT bot_clima.config_json(true) AS cfg",
         "options": {}
@@ -69,7 +56,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        660,
+        440,
         0
       ],
       "credentials": {
@@ -78,7 +65,84 @@
           "name": "Postgres account"
         }
       },
+      "id": "d4c2b1a0-0004-4c00-9000-000000000004"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-enlace",
+              "leftValue": "={{ /(https?:\\/\\/|geo:|\\d{1,2}\\.\\d{3,}|°)/i.test($('Mensaje entrante').first().json.texto || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "¿Trae enlace o coordenadas?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        660,
+        0
+      ],
       "id": "d4c2b1a0-0005-4c00-9000-000000000005"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://iagro360.xyz/panel/api/whatsapp/ubicacion",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-token",
+              "value": "={{ $('Configuración').first().json.cfg.wa_api_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ texto: $('Mensaje entrante').first().json.texto }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Ubicación en el texto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        880,
+        -120
+      ],
+      "onError": "continueRegularOutput",
+      "id": "d4c2b1a0-0006-4c00-9000-000000000006"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Intención del mensaje, con reglas (sin IA). Los botones se reconocen por su título.\nconst m0 = $('Mensaje entrante').first().json;\n// Ubicación en un enlace (Google Maps, Waze, Apple…) o escrita: la lee el panel, solo si el mensaje traía algo así\nlet enlace = null;\ntry { enlace = $('Ubicación en el texto').first().json; } catch (_) { /* no traía enlaces ni coordenadas */ }\nconst deEnlace = enlace && enlace.lat != null && enlace.lon != null;\nconst m = { ...m0, lat: m0.lat ?? (deEnlace ? Number(enlace.lat) : null), lon: m0.lon ?? (deEnlace ? Number(enlace.lon) : null) };\nconst enlaceIlegible = !!(enlace && enlace.enlace && !deEnlace);\nconst norm = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n  .replace(/[¿?¡!.,;:]/g, ' ').replace(/\\s+/g, ' ').trim();\nconst s = norm(m.texto);\nconst sinIcono = s.replace(/^[^a-z0-9]+/, '').trim();   // \"📡 ver radar\" → \"ver radar\"\nconst DIAS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];\nconst BOTONES = {\n  'mi ubicacion': 'PEDIR_UBICACION', 'enviar ubicacion': 'PEDIR_UBICACION', 'cambiar lote': 'PEDIR_UBICACION',\n  'ver radar': 'RADAR', 'actualizar radar': 'RADAR',\n  'manana': 'DIA', 'ver semana': 'SEMANA', 'actualizar': 'SEMANA', 'ver pronostico': 'SEMANA',\n};\n\nlet intent = 'SEMANA', dia = null, codigo = null;\nconst saludo = /^(hola|hla|ola|buenas|buenos dias|buen dia|buenas tardes|buenas noches|holi)\\b/.test(s);\nconst inv = s.match(/quiero alertas iagro\\s+([a-z0-9]{4,8})/);\n\nif (m.lat != null && m.lon != null) {\n  intent = 'UBICACION_RECIBIDA';\n} else if (enlaceIlegible) {\n  intent = 'UBICACION_ILEGIBLE';\n} else if (inv) {\n  intent = 'INVITACION';\n  codigo = inv[1].toUpperCase();\n} else if (BOTONES[sinIcono]) {\n  intent = BOTONES[sinIcono];\n  if (intent === 'DIA') dia = 'manana';\n} else {\n  if (/\\bhoy\\b/.test(s)) dia = 'hoy';\n  else if (/\\b(manana|mnn|mñn)\\b/.test(s)) dia = 'manana';\n  else dia = DIAS.find((d) => s.includes(d)) || null;\n\n  if (/(fumig|riego|regar|plaga|precio|soya|vender|semilla|abono|insecticida|herbicida)/.test(s)) intent = 'FUERA';\n  else if (/(cambiar (mi |el )?(lote|ubicacion|parcela)|otro lado|otra parcela|mi ubicacion|enviar ubicacion)/.test(s)) intent = 'PEDIR_UBICACION';\n  else if (/(radar|donde .*llov|donde .*lluvia|ya viene|se acerca|ya llega|viene la lluvia)/.test(s)) intent = 'RADAR';\n  else if (/(llov|lluv|yuev|aguacero|chubasco|tormenta)/.test(s) && !dia) intent = 'LLUVIA';\n  else if (dia) intent = 'DIA';\n  else if (/^(gracias|grax|muchas gracias|oki|ok|okey|ya|listo|dale|bueno|perfecto|genial)\\b/.test(s) || /^[\\u{1F44D}\\u{1F64F}\\u{1F44C}\\u{1F60A}\\s]+$/u.test(String(m.texto).trim())) intent = 'GRACIAS';\n}\nreturn [{ json: { ...m, intent, dia, codigo, saludo } }];"
+      },
+      "name": "Intención",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "id": "d4c2b1a0-0007-4c00-9000-000000000007"
     },
     {
       "parameters": {
@@ -92,7 +156,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        880,
+        1320,
         0
       ],
       "credentials": {
@@ -101,7 +165,7 @@
           "name": "Postgres account"
         }
       },
-      "id": "d4c2b1a0-0006-4c00-9000-000000000006"
+      "id": "d4c2b1a0-0008-4c00-9000-000000000008"
     },
     {
       "parameters": {
@@ -123,24 +187,24 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1100,
+        1540,
         0
       ],
       "onError": "continueRegularOutput",
-      "id": "d4c2b1a0-0007-4c00-9000-000000000007"
+      "id": "d4c2b1a0-0009-4c00-9000-000000000009"
     },
     {
       "parameters": {
-        "jsCode": "// Respuesta: un solo mensaje de servicio (imagen + texto + botones, o botón de enlace) para la API de WhatsApp\nconst m = $('Intención').first().json;\nconst cfg = $('Configuración').first().json.cfg || {};\nconst c = $('Cliente').first().json.c || {};\nconst p = $json || {};                                  // respuesta del panel: { dias, imagen } o un error\nconst SITIO = 'https://iagro360.xyz';\nconst conLote = c.lat != null && c.lon != null;\nconst dias = Array.isArray(p.dias) ? p.dias : [];\nconst norm = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');\nconst fmtMm = (mm) => (mm >= 1 ? String(Math.round(mm)) : Number(mm).toFixed(1));\nconst nombre = /[a-záéíóúñ]/i.test(m.nombre_whatsapp) ? m.nombre_whatsapp.split(/\\s+/)[0] : '';\n\nconst lugar = conLote ? 'tu ubicación' : 'Santa Cruz';\nconst pie = conLote ? 'IAGRO · Según tu ubicación' : 'IAGRO · Santa Cruz (general)';\nconst PEDIR = '\\n\\n👉 Este pronóstico es de *Santa Cruz en general*. Para el de *tu lote*, toca *📍 Mi ubicación*.';\nconst B = { ubic: '📍 Mi ubicación', radar: '📡 Ver radar', manana: '📅 Mañana', semana: '📅 Ver semana', actualizar: '🔄 Actualizar' };\n// Sin ubicación, el primer botón siempre la pide\nconst nav = (a, b) => (conLote ? [a, b] : [B.ubic, a]);\n\nconst to = m.telefono;\nconst base = { messaging_product: 'whatsapp', recipient_type: 'individual', to };\nconst conBotones = (texto, lista, imagen) => ({ ...base, type: 'interactive', interactive: {\n  type: 'button',\n  ...(imagen ? { header: { type: 'image', image: { link: imagen } } } : {}),\n  body: { text: texto.slice(0, 1024) },\n  footer: { text: pie },\n  action: { buttons: lista.slice(0, 3).map((t, i) => ({ type: 'reply', reply: { id: 'b' + (i + 1), title: t } })) },\n} });\nconst conEnlace = (texto, boton, url) => ({ ...base, type: 'interactive', interactive: {\n  type: 'cta_url', body: { text: texto.slice(0, 1024) }, footer: { text: pie },\n  action: { name: 'cta_url', parameters: { display_text: boton, url } },\n} });\nconst pedirUbicacion = (texto) => ({ ...base, type: 'interactive', interactive: {\n  type: 'location_request_message', body: { text: texto }, action: { name: 'send_location' },\n} });\nconst soloTexto = (texto) => ({ ...base, type: 'text', text: { body: texto, preview_url: false } });\n\n// ---------- Textos con el pronóstico ----------\nconst proxima = dias.find((d) => d.mm >= 1);\nconst iProx = proxima ? dias.indexOf(proxima) : -1;\nconst cuando = (d) => (dias.indexOf(d) === 0 ? 'hoy' : dias.indexOf(d) === 1 ? 'mañana' : d.nombre.toLowerCase() + ' ' + d.ddmm);\n\nfunction semana() {\n  let t = proxima\n    ? '🌧️ Lluvia en ' + lugar + ': *' + cuando(proxima) + (proxima.inicio ? ' desde las ' + proxima.inicio : '') + ', unos ' + fmtMm(proxima.mm) + ' mm*' + (proxima.prob ? ' (' + proxima.prob + '%)' : '') + '.'\n    : '☀️ Sin lluvias importantes en ' + lugar + ' en los próximos días.';\n  const antes = iProx === -1 ? dias.slice(0, 7) : dias.slice(0, iProx);\n  const calor = antes.length ? Math.max(...antes.map((d) => d.max ?? -99)) : -99;\n  if (iProx >= 2) t += '\\nAntes, ' + iProx + ' días secos' + (calor >= 35 ? ' y con calor (hasta ' + calor + '°)' : '') + '.';\n  else if (iProx === -1 && calor >= 35) t += '\\nCon calor: hasta ' + calor + '°.';\n  if (dias.slice(0, 3).filter((d) => d.viento >= 20).length >= 2) t += '\\n⚠️ Viento fuerte estos días: no conviene fumigar.';\n  return t;\n}\n\nfunction delDia() {\n  const i = m.dia === 'hoy' ? 0 : m.dia === 'manana' ? 1 : dias.findIndex((d) => norm(d.nombre) === m.dia);\n  const d = dias[i < 0 ? 0 : i];\n  const etiqueta = i <= 0 ? 'Hoy' : i === 1 ? 'Mañana' : d.nombre;\n  let t = '📍 ' + (conLote ? 'Tu ubicación' : 'Santa Cruz (general)') + '\\n*' + etiqueta + ' ' + d.ddmm + ':* ' + (d.min ?? '–') + '° a ' + (d.max ?? '–') + '°\\n';\n  t += d.mm >= 1 ? '🌧️ Lluvia' + (d.inicio ? ' desde las ' + d.inicio : '') + ', unos ' + fmtMm(d.mm) + ' mm' + (d.prob ? ' (' + d.prob + '%)' : '') + '.'\n    : d.mm > 0 ? '🌦️ Apenas unas gotas (' + fmtMm(d.mm) + ' mm).' : '☀️ Sin lluvia.';\n  t += '\\n💨 Viento ' + d.viento + ' km/h' + (d.dir ? ' ' + d.dir : '') + '.';\n  if (d.viento >= 20) t += ' No conviene fumigar.';\n  else if (d.mm < 1) t += ' Buen día para aplicar, temprano.';\n  return t;\n}\n\nfunction lluvia() {\n  if (!proxima) return '☀️ Sin lluvias importantes en ' + lugar + ' en los próximos ' + dias.length + ' días.';\n  let t = '🌧️ Próxima lluvia en ' + lugar + ':\\n*' + cuando(proxima).replace(/^./, (x) => x.toUpperCase()) + (proxima.inicio ? ' desde las ' + proxima.inicio : '') + ', unos ' + fmtMm(proxima.mm) + ' mm*' + (proxima.prob ? ' (' + proxima.prob + '%)' : '') + '.';\n  if (iProx >= 2) t += '\\nAntes, ' + iProx + ' días secos.';\n  return t;\n}\n\n// ---------- Respuesta según la intención ----------\nconst radarUrl = SITIO + '/radar/' + (conLote && c.id ? c.id : 'santa-cruz');\nconst imagen = p.imagen ? SITIO + p.imagen : null;\nconst NECESITA_DATOS = ['SEMANA', 'DIA', 'LLUVIA', 'UBICACION_RECIBIDA', 'INVITACION'];\nlet cuerpo, resumen;\n\nif (NECESITA_DATOS.includes(m.intent) && !dias.length) {\n  resumen = '⚠️ No pude traer el pronóstico en este momento. Intenta de nuevo en unos minutos.';\n  cuerpo = conBotones(resumen, [B.actualizar, B.radar]);\n} else if (m.intent === 'RADAR') {\n  resumen = '📡 Radar de lluvia en vivo ' + (conLote ? 'centrado en *tu ubicación*' : 'de *Santa Cruz*') + '. Toca el botón para verlo y mover el mapa.'\n    + (conLote ? '' : '\\n\\nPara verlo sobre tu lote, envíame tu ubicación con 📎.');\n  cuerpo = conEnlace(resumen, 'Ver radar', radarUrl);\n} else if (m.intent === 'PEDIR_UBICACION') {\n  resumen = '📍 Toca *Enviar ubicación* y elige el punto de tu lote (puedes mover el mapa hasta tu parcela). Solo la usamos para tu pronóstico y tu radar.';\n  cuerpo = pedirUbicacion(resumen);\n} else if (m.intent === 'GRACIAS') {\n  resumen = '¡A la orden' + (nombre ? ', ' + nombre : '') + '! 🌾 Escríbeme *lluvia*, *mañana* o *radar* cuando quieras.';\n  cuerpo = soloTexto(resumen);\n} else if (m.intent === 'FUERA') {\n  resumen = 'Por ahora solo te ayudo con el *pronóstico* y el *radar* de lluvia 🌦️';\n  cuerpo = conBotones(resumen, nav(B.semana, B.radar));\n} else if (m.intent === 'DIA') {\n  resumen = delDia() + (conLote ? '' : PEDIR);\n  cuerpo = conBotones(resumen, nav(B.semana, B.radar));\n} else if (m.intent === 'LLUVIA') {\n  resumen = lluvia() + (conLote ? '' : PEDIR);\n  cuerpo = conBotones(resumen, nav(B.radar, B.semana));\n} else {\n  // SEMANA, UBICACION_RECIBIDA, INVITACION: el primer mensaje, con la imagen de 7 días\n  let antes = '';\n  if (m.intent === 'UBICACION_RECIBIDA') antes = '✅ *Ubicación ' + (c.nuevo ? 'guardada' : 'actualizada') + '.* Desde ahora te muestro el pronóstico de ese punto.\\n\\n';\n  else if (m.intent === 'INVITACION') antes = '¡Hola' + (nombre ? ' ' + nombre : '') + '! 👋 Te invitaron a *IAGRO*: pronóstico y radar de lluvia para tu campo.\\n\\n';\n  else if (m.saludo) antes = '¡Hola' + (nombre ? ' ' + nombre : '') + '! 👋\\n\\n';\n  resumen = antes + semana() + (conLote ? '' : PEDIR);\n  cuerpo = conBotones(resumen, conLote ? [B.radar, B.manana, B.actualizar] : [B.ubic, B.radar, B.manana], imagen);\n}\n\nreturn [{ json: {\n  meta_url: 'https://graph.facebook.com/' + String(cfg.whatsapp_api_version || 'v25.0').trim() + '/' + String(cfg.whatsapp_phone_number_id || '1356446567560317').trim() + '/messages',\n  meta_cuerpo: cuerpo,\n  resumen,\n  chatwoot: String(cfg.chatwoot_url_publica || '').replace(/\\/+$/, '') + '/api/v1/accounts/' + cfg.chatwoot_account_id + '/conversations/' + m.conversation_id + '/messages',\n} }];"
+        "jsCode": "// Respuesta: un solo mensaje de servicio (imagen + texto + botones, o botón de enlace) para la API de WhatsApp\nconst m = $('Intención').first().json;\nconst cfg = $('Configuración').first().json.cfg || {};\nconst c = $('Cliente').first().json.c || {};\nconst p = $json || {};                                  // respuesta del panel: { dias, imagen } o un error\nconst SITIO = 'https://iagro360.xyz';\nconst conLote = c.lat != null && c.lon != null;\nconst dias = Array.isArray(p.dias) ? p.dias : [];\nconst norm = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');\nconst fmtMm = (mm) => (mm >= 1 ? String(Math.round(mm)) : Number(mm).toFixed(1));\nconst nombre = /[a-záéíóúñ]/i.test(m.nombre_whatsapp) ? m.nombre_whatsapp.split(/\\s+/)[0] : '';\n\nconst lugar = conLote ? 'tu ubicación' : 'Santa Cruz';\nconst pie = conLote ? 'IAGRO · Según tu ubicación' : 'IAGRO · Santa Cruz (general)';\nconst PEDIR = '\\n\\n👉 Este pronóstico es de *Santa Cruz en general*. Para el de *tu lote*, toca *📍 Mi ubicación*.';\nconst B = { ubic: '📍 Mi ubicación', radar: '📡 Ver radar', manana: '📅 Mañana', semana: '📅 Ver semana', actualizar: '🔄 Actualizar' };\n// Sin ubicación, el primer botón siempre la pide\nconst nav = (a, b) => (conLote ? [a, b] : [B.ubic, a]);\n\nconst to = m.telefono;\nconst base = { messaging_product: 'whatsapp', recipient_type: 'individual', to };\nconst conBotones = (texto, lista, imagen) => ({ ...base, type: 'interactive', interactive: {\n  type: 'button',\n  ...(imagen ? { header: { type: 'image', image: { link: imagen } } } : {}),\n  body: { text: texto.slice(0, 1024) },\n  footer: { text: pie },\n  action: { buttons: lista.slice(0, 3).map((t, i) => ({ type: 'reply', reply: { id: 'b' + (i + 1), title: t } })) },\n} });\nconst conEnlace = (texto, boton, url) => ({ ...base, type: 'interactive', interactive: {\n  type: 'cta_url', body: { text: texto.slice(0, 1024) }, footer: { text: pie },\n  action: { name: 'cta_url', parameters: { display_text: boton, url } },\n} });\nconst pedirUbicacion = (texto) => ({ ...base, type: 'interactive', interactive: {\n  type: 'location_request_message', body: { text: texto }, action: { name: 'send_location' },\n} });\nconst soloTexto = (texto) => ({ ...base, type: 'text', text: { body: texto, preview_url: false } });\n\n// ---------- Textos con el pronóstico ----------\nconst proxima = dias.find((d) => d.mm >= 1);\nconst iProx = proxima ? dias.indexOf(proxima) : -1;\nconst cuando = (d) => (dias.indexOf(d) === 0 ? 'hoy' : dias.indexOf(d) === 1 ? 'mañana' : d.nombre.toLowerCase() + ' ' + d.ddmm);\n\nfunction semana() {\n  let t = proxima\n    ? '🌧️ Lluvia en ' + lugar + ': *' + cuando(proxima) + (proxima.inicio ? ' desde las ' + proxima.inicio : '') + ', unos ' + fmtMm(proxima.mm) + ' mm*' + (proxima.prob ? ' (' + proxima.prob + '%)' : '') + '.'\n    : '☀️ Sin lluvias importantes en ' + lugar + ' en los próximos días.';\n  const antes = iProx === -1 ? dias.slice(0, 7) : dias.slice(0, iProx);\n  const calor = antes.length ? Math.max(...antes.map((d) => d.max ?? -99)) : -99;\n  if (iProx >= 2) t += '\\nAntes, ' + iProx + ' días secos' + (calor >= 35 ? ' y con calor (hasta ' + calor + '°)' : '') + '.';\n  else if (iProx === -1 && calor >= 35) t += '\\nCon calor: hasta ' + calor + '°.';\n  if (dias.slice(0, 3).filter((d) => d.viento >= 20).length >= 2) t += '\\n⚠️ Viento fuerte estos días: no conviene fumigar.';\n  return t;\n}\n\nfunction delDia() {\n  const i = m.dia === 'hoy' ? 0 : m.dia === 'manana' ? 1 : dias.findIndex((d) => norm(d.nombre) === m.dia);\n  const d = dias[i < 0 ? 0 : i];\n  const etiqueta = i <= 0 ? 'Hoy' : i === 1 ? 'Mañana' : d.nombre;\n  let t = '📍 ' + (conLote ? 'Tu ubicación' : 'Santa Cruz (general)') + '\\n*' + etiqueta + ' ' + d.ddmm + ':* ' + (d.min ?? '–') + '° a ' + (d.max ?? '–') + '°\\n';\n  t += d.mm >= 1 ? '🌧️ Lluvia' + (d.inicio ? ' desde las ' + d.inicio : '') + ', unos ' + fmtMm(d.mm) + ' mm' + (d.prob ? ' (' + d.prob + '%)' : '') + '.'\n    : d.mm > 0 ? '🌦️ Apenas unas gotas (' + fmtMm(d.mm) + ' mm).' : '☀️ Sin lluvia.';\n  t += '\\n💨 Viento ' + d.viento + ' km/h' + (d.dir ? ' ' + d.dir : '') + '.';\n  if (d.viento >= 20) t += ' No conviene fumigar.';\n  else if (d.mm < 1) t += ' Buen día para aplicar, temprano.';\n  return t;\n}\n\nfunction lluvia() {\n  if (!proxima) return '☀️ Sin lluvias importantes en ' + lugar + ' en los próximos ' + dias.length + ' días.';\n  let t = '🌧️ Próxima lluvia en ' + lugar + ':\\n*' + cuando(proxima).replace(/^./, (x) => x.toUpperCase()) + (proxima.inicio ? ' desde las ' + proxima.inicio : '') + ', unos ' + fmtMm(proxima.mm) + ' mm*' + (proxima.prob ? ' (' + proxima.prob + '%)' : '') + '.';\n  if (iProx >= 2) t += '\\nAntes, ' + iProx + ' días secos.';\n  return t;\n}\n\n// ---------- Respuesta según la intención ----------\nconst radarUrl = SITIO + '/radar/' + (conLote && c.id ? c.id : 'santa-cruz');\nconst imagen = p.imagen ? SITIO + p.imagen : null;\nconst NECESITA_DATOS = ['SEMANA', 'DIA', 'LLUVIA', 'UBICACION_RECIBIDA', 'INVITACION'];\nlet cuerpo, resumen;\n\nif (NECESITA_DATOS.includes(m.intent) && !dias.length) {\n  resumen = '⚠️ No pude traer el pronóstico en este momento. Intenta de nuevo en unos minutos.';\n  cuerpo = conBotones(resumen, [B.actualizar, B.radar]);\n} else if (m.intent === 'RADAR') {\n  resumen = '📡 Radar de lluvia en vivo ' + (conLote ? 'centrado en *tu ubicación*' : 'de *Santa Cruz*') + '. Toca el botón para verlo y mover el mapa.'\n    + (conLote ? '' : '\\n\\nPara verlo sobre tu lote, envíame tu ubicación con 📎.');\n  cuerpo = conEnlace(resumen, 'Ver radar', radarUrl);\n} else if (m.intent === 'UBICACION_ILEGIBLE') {\n  resumen = '😕 No pude leer la ubicación de ese enlace. Toca *Enviar ubicación* y elige el punto de tu lote en el mapa.';\n  cuerpo = pedirUbicacion(resumen);\n} else if (m.intent === 'PEDIR_UBICACION') {\n  resumen = '📍 Toca *Enviar ubicación* y elige el punto de tu lote (puedes mover el mapa hasta tu parcela). Solo la usamos para tu pronóstico y tu radar.';\n  cuerpo = pedirUbicacion(resumen);\n} else if (m.intent === 'GRACIAS') {\n  resumen = '¡A la orden' + (nombre ? ', ' + nombre : '') + '! 🌾 Escríbeme *lluvia*, *mañana* o *radar* cuando quieras.';\n  cuerpo = soloTexto(resumen);\n} else if (m.intent === 'FUERA') {\n  resumen = 'Por ahora solo te ayudo con el *pronóstico* y el *radar* de lluvia 🌦️';\n  cuerpo = conBotones(resumen, nav(B.semana, B.radar));\n} else if (m.intent === 'DIA') {\n  resumen = delDia() + (conLote ? '' : PEDIR);\n  cuerpo = conBotones(resumen, nav(B.semana, B.radar));\n} else if (m.intent === 'LLUVIA') {\n  resumen = lluvia() + (conLote ? '' : PEDIR);\n  cuerpo = conBotones(resumen, nav(B.radar, B.semana));\n} else {\n  // SEMANA, UBICACION_RECIBIDA, INVITACION: el primer mensaje, con la imagen de 7 días\n  let antes = '';\n  if (m.intent === 'UBICACION_RECIBIDA') antes = '✅ *Ubicación ' + (c.nuevo ? 'guardada' : 'actualizada') + '.* Desde ahora te muestro el pronóstico de ese punto.\\n\\n';\n  else if (m.intent === 'INVITACION') antes = '¡Hola' + (nombre ? ' ' + nombre : '') + '! 👋 Te invitaron a *IAGRO*: pronóstico y radar de lluvia para tu campo.\\n\\n';\n  else if (m.saludo) antes = '¡Hola' + (nombre ? ' ' + nombre : '') + '! 👋\\n\\n';\n  resumen = antes + semana() + (conLote ? '' : PEDIR);\n  cuerpo = conBotones(resumen, conLote ? [B.radar, B.manana, B.actualizar] : [B.ubic, B.radar, B.manana], imagen);\n}\n\nreturn [{ json: {\n  meta_url: 'https://graph.facebook.com/' + String(cfg.whatsapp_api_version || 'v25.0').trim() + '/' + String(cfg.whatsapp_phone_number_id || '1356446567560317').trim() + '/messages',\n  meta_cuerpo: cuerpo,\n  resumen,\n  chatwoot: String(cfg.chatwoot_url_publica || '').replace(/\\/+$/, '') + '/api/v1/accounts/' + cfg.chatwoot_account_id + '/conversations/' + m.conversation_id + '/messages',\n} }];"
       },
       "name": "Armar respuesta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
+        1760,
         0
       ],
-      "id": "d4c2b1a0-0008-4c00-9000-000000000008"
+      "id": "d4c2b1a0-0010-4c00-9000-000000000010"
     },
     {
       "parameters": {
@@ -159,7 +223,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1540,
+        1980,
         0
       ],
       "credentials": {
@@ -169,7 +233,7 @@
         }
       },
       "onError": "continueErrorOutput",
-      "id": "d4c2b1a0-0009-4c00-9000-000000000009"
+      "id": "d4c2b1a0-0011-4c00-9000-000000000011"
     },
     {
       "parameters": {
@@ -188,7 +252,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1780,
+        2220,
         -120
       ],
       "credentials": {
@@ -197,7 +261,7 @@
           "name": "Header Auth account"
         }
       },
-      "id": "d4c2b1a0-0010-4c00-9000-000000000010"
+      "id": "d4c2b1a0-0012-4c00-9000-000000000012"
     },
     {
       "parameters": {
@@ -207,10 +271,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1780,
+        2220,
         120
       ],
-      "id": "d4c2b1a0-0011-4c00-9000-000000000011"
+      "id": "d4c2b1a0-0013-4c00-9000-000000000013"
     },
     {
       "parameters": {
@@ -229,7 +293,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2000,
+        2440,
         120
       ],
       "credentials": {
@@ -238,7 +302,7 @@
           "name": "Header Auth account"
         }
       },
-      "id": "d4c2b1a0-0012-4c00-9000-000000000012"
+      "id": "d4c2b1a0-0014-4c00-9000-000000000014"
     },
     {
       "parameters": {
@@ -257,7 +321,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2220,
+        2660,
         120
       ],
       "credentials": {
@@ -266,7 +330,7 @@
           "name": "Header Auth account"
         }
       },
-      "id": "d4c2b1a0-0013-4c00-9000-000000000013"
+      "id": "d4c2b1a0-0015-4c00-9000-000000000015"
     }
   ],
   "pinData": {},
@@ -286,17 +350,6 @@
       "main": [
         [
           {
-            "node": "Intención",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Intención": {
-      "main": [
-        [
-          {
             "node": "Configuración",
             "type": "main",
             "index": 0
@@ -305,6 +358,46 @@
       ]
     },
     "Configuración": {
+      "main": [
+        [
+          {
+            "node": "¿Trae enlace o coordenadas?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Trae enlace o coordenadas?": {
+      "main": [
+        [
+          {
+            "node": "Ubicación en el texto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Intención",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ubicación en el texto": {
+      "main": [
+        [
+          {
+            "node": "Intención",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intención": {
       "main": [
         [
           {
