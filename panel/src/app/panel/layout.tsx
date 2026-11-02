@@ -1,9 +1,7 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
 import { Providers } from '@/components/providers';
+import { interPanel as inter } from '@/fuentes/fuentes';
 import '../globals.css';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
   title: { default: 'IAGRO Panel', template: '%s · IAGRO Panel' },

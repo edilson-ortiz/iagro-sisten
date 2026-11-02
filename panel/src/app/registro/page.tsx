@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from 'next';
-import { Newsreader, Work_Sans } from 'next/font/google';
+import { tituloRegistro as titulo, textoRegistro as texto } from '@/fuentes/fuentes';
 import { Registro } from './registro';
-
-const titulo = Newsreader({ subsets: ['latin'], weight: ['400', '600'], variable: '--f-titulo' });
-const texto = Work_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--f-texto' });
 
 export const metadata: Metadata = {
   title: { absolute: 'iAgro · Regístrate al pronóstico del clima' },

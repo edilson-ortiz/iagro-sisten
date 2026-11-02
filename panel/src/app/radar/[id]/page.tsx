@@ -1,13 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
-import { IBM_Plex_Mono, Inter, Zilla_Slab } from 'next/font/google';
 import { query, sql } from '@/lib/db';
+import { interRadar as inter, monoRadar as mono, zillaRadar as zilla } from '@/fuentes/fuentes';
 import s from './radar.module.css';
-
-const zilla = Zilla_Slab({ subsets: ['latin'], weight: ['500', '700'], variable: '--f-titulo' });
-const inter = Inter({ subsets: ['latin'], weight: ['400', '600', '700'], variable: '--f-texto' });
-const mono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--f-mono' });
 
 export const dynamic = 'force-dynamic';
 
