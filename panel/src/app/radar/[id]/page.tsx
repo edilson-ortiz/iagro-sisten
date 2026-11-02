@@ -13,8 +13,12 @@ export const dynamic = 'force-dynamic';
 
 type Campo = { nombre: string | null; lat: number | null; lon: number | null };
 
-/** Campo del cliente (bot_clima.usuarios: la misma ficha que edita el panel y que usan el bot y las alertas) */
+/**
+ * Campo del cliente (bot_clima.usuarios: la misma ficha que edita el panel y que usan el bot y las alertas).
+ * /radar/santa-cruz: radar general, para el botón "Ver radar" del bot de WhatsApp a quien aún no envió su ubicación.
+ */
 const campo = cache(async (id: string): Promise<Campo | null> => {
+  if (id === 'santa-cruz') return { nombre: 'Santa Cruz de la Sierra', lat: -17.7833, lon: -63.1821 };
   if (!/^\d{1,12}$/.test(id)) return null;
   const [c] = await query<Campo>(sql`
     SELECT nombre, latitud AS lat, longitud AS lon FROM bot_clima.usuarios WHERE id = ${Number(id)}`);

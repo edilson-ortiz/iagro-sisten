@@ -1,0 +1,397 @@
+{
+  "name": "IAGRO · Bot WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 🤖 IAGRO · Bot WhatsApp (sin IA)\nResponde por **WhatsApp** con **mensajes de servicio** (gratis dentro de las 24 h después de que el cliente escribe): **imagen + texto + botones** en un solo mensaje, directo a la API de WhatsApp.\n\n**Intenciones (reglas, sin IA):** saludo/pronóstico → semana con imagen · hoy/mañana/un día · ¿cuándo llueve? · radar (botón **Ver radar** a la web) · cambiar lote (pide la ubicación) · gracias · fumigar/precios (fuera de alcance) · invitación (\"Quiero alertas IAgro CÓDIGO\").\n- Sin ubicación: pronóstico de **Santa Cruz (general)** y botón **📍 Mi ubicación**. La ubicación compartida se guarda en el panel (`bot_clima.wa_cliente`).\n- Pronóstico: la **API IAGRO** a través del panel (`/panel/api/whatsapp/pronostico`, de a una consulta y 30 min de caché por zona); la imagen la dibuja el panel.\n- Cada respuesta queda como **nota privada** en Chatwoot. Si Meta la rechaza, se envía el texto por Chatwoot y el motivo queda en otra nota.\n- No responde a los botones de las alertas ni si un agente atiende el chat (etiqueta `humano` o asignado y abierto en las últimas 6 h).",
+        "height": 420,
+        "width": 820,
+        "color": 4
+      },
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        -500
+      ],
+      "id": "d4c2b1a0-0001-4c00-9000-000000000001"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "7c3e9a51-2f4d-4b8e-a6c1-93d5e0b7f284",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "7c3e9a51-2f4d-4b8e-a6c1-93d5e0b7f284",
+      "id": "d4c2b1a0-0002-4c00-9000-000000000002"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mensaje que el cliente escribe por WhatsApp. Acepta los dos avisos de Chatwoot:\n//  - Webhook (Integraciones → Webhooks, \"Mensaje creado\"): el cuerpo es el mensaje.\n//  - Automatización (\"Enviar evento de webhook\"): el cuerpo es la conversación, con su último mensaje en messages[].\nconst b = $json.body || {};\nlet conv, msg;\nif (b.event === 'message_created') {\n  conv = b.conversation || {};\n  msg = b;\n} else if (String(b.event || '').startsWith('automation_event.')) {\n  conv = b;\n  msg = (b.messages || [])[(b.messages || []).length - 1] || {};\n} else {\n  return [];\n}\nif (!(msg.message_type === 'incoming' || msg.message_type === 0) || msg.private === true) return [];\nif (conv.channel !== 'Channel::Whatsapp') return [];\n\n// Botones de la plantilla de alertas (\"Dejar de recibir\", \"ALTA\"…): los atiende \"IAGRO · Seguimiento de estados\"\nconst t = String(msg.content || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/^[^a-z0-9]+/, '').trim();\nif (/^(dejar de recibir|no recibir alertas|desactivar alertas|activar alertas|recibir alertas|alta|solo lluvias fuertes|lluvias fuertes)$/.test(t)) return [];\n\n// Un agente atiende el chat en Chatwoot: etiqueta \"humano\", o asignado y abierto en las últimas 6 h\nconst etiquetas = (conv.labels || []).map((x) => String(x).toLowerCase());\nif (etiquetas.includes('humano')) return [];\nif (conv.meta?.assignee && Number(conv.agent_last_seen_at || 0) * 1000 > Date.now() - 6 * 3600 * 1000) return [];\n\nconst sender = conv.meta?.sender || b.sender || {};\nconst telefono = String(sender.phone_number || '').replace(/\\D/g, '');\nif (telefono.length < 8 || !conv.id) return [];\n// Ubicación compartida con 📎 (o con el botón \"Enviar ubicación\")\nconst loc = (msg.attachments || []).find((a) => a.file_type === 'location' && a.coordinates_lat != null);\nreturn [{ json: {\n  telefono,\n  conversation_id: conv.id,\n  nombre_whatsapp: String(sender.name || '').trim(),\n  texto: String(msg.content || ''),\n  lat: loc ? Number(loc.coordinates_lat) : null,\n  lon: loc ? Number(loc.coordinates_long) : null,\n} }];"
+      },
+      "name": "Mensaje entrante",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "d4c2b1a0-0003-4c00-9000-000000000003"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Intención del mensaje, con reglas (sin IA). Los botones se reconocen por su título.\nconst m = $json;\nconst norm = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n  .replace(/[¿?¡!.,;:]/g, ' ').replace(/\\s+/g, ' ').trim();\nconst s = norm(m.texto);\nconst sinIcono = s.replace(/^[^a-z0-9]+/, '').trim();   // \"📡 ver radar\" → \"ver radar\"\nconst DIAS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];\nconst BOTONES = {\n  'mi ubicacion': 'PEDIR_UBICACION', 'enviar ubicacion': 'PEDIR_UBICACION', 'cambiar lote': 'PEDIR_UBICACION',\n  'ver radar': 'RADAR', 'actualizar radar': 'RADAR',\n  'manana': 'DIA', 'ver semana': 'SEMANA', 'actualizar': 'SEMANA', 'ver pronostico': 'SEMANA',\n};\n\nlet intent = 'SEMANA', dia = null, codigo = null;\nconst saludo = /^(hola|hla|ola|buenas|buenos dias|buen dia|buenas tardes|buenas noches|holi)\\b/.test(s);\nconst inv = s.match(/quiero alertas iagro\\s+([a-z0-9]{4,8})/);\n\nif (m.lat != null && m.lon != null) {\n  intent = 'UBICACION_RECIBIDA';\n} else if (inv) {\n  intent = 'INVITACION';\n  codigo = inv[1].toUpperCase();\n} else if (BOTONES[sinIcono]) {\n  intent = BOTONES[sinIcono];\n  if (intent === 'DIA') dia = 'manana';\n} else {\n  if (/\\bhoy\\b/.test(s)) dia = 'hoy';\n  else if (/\\b(manana|mnn|mñn)\\b/.test(s)) dia = 'manana';\n  else dia = DIAS.find((d) => s.includes(d)) || null;\n\n  if (/(fumig|riego|regar|plaga|precio|soya|vender|semilla|abono|insecticida|herbicida)/.test(s)) intent = 'FUERA';\n  else if (/(cambiar (mi |el )?(lote|ubicacion|parcela)|otro lado|otra parcela|mi ubicacion|enviar ubicacion)/.test(s)) intent = 'PEDIR_UBICACION';\n  else if (/(radar|donde .*llov|donde .*lluvia|ya viene|se acerca|ya llega|viene la lluvia)/.test(s)) intent = 'RADAR';\n  else if (/(llov|lluv|yuev|aguacero|chubasco|tormenta)/.test(s) && !dia) intent = 'LLUVIA';\n  else if (dia) intent = 'DIA';\n  else if (/^(gracias|grax|muchas gracias|oki|ok|okey|ya|listo|dale|bueno|perfecto|genial)\\b/.test(s) || /^[\\u{1F44D}\\u{1F64F}\\u{1F44C}\\u{1F60A}\\s]+$/u.test(String(m.texto).trim())) intent = 'GRACIAS';\n}\nreturn [{ json: { ...m, intent, dia, codigo, saludo } }];"
+      },
+      "name": "Intención",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "d4c2b1a0-0004-4c00-9000-000000000004"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.config_json(true) AS cfg",
+        "options": {}
+      },
+      "name": "Configuración",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "id": "d4c2b1a0-0005-4c00-9000-000000000005"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT bot_clima.wa_cliente($1, NULLIF($2, ''), NULLIF($3, '')::double precision, NULLIF($4, '')::double precision, NULLIF($5, '')) AS c",
+        "options": {
+          "queryReplacement": "={{ [ $('Intención').first().json.telefono, $('Intención').first().json.nombre_whatsapp, String($('Intención').first().json.lat ?? ''), String($('Intención').first().json.lon ?? ''), $('Intención').first().json.codigo || '' ] }}"
+        }
+      },
+      "name": "Cliente",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "3rBndDAmfD2YkJwN",
+          "name": "Postgres account"
+        }
+      },
+      "id": "d4c2b1a0-0006-4c00-9000-000000000006"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://iagro360.xyz/panel/api/whatsapp/pronostico?lat=' + ($json.c?.lat ?? -17.7833) + '&lon=' + ($json.c?.lon ?? -63.1821) + '&general=' + ($json.c?.lat != null ? '0' : '1') + '&lugar=' + encodeURIComponent($json.c?.lat != null ? ($json.c?.nombre || 'Tu ubicación') : 'Santa Cruz de la Sierra') }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-token",
+              "value": "={{ $('Configuración').first().json.cfg.wa_api_token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "Pronóstico (panel)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1100,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "id": "d4c2b1a0-0007-4c00-9000-000000000007"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Respuesta: un solo mensaje de servicio (imagen + texto + botones, o botón de enlace) para la API de WhatsApp\nconst m = $('Intención').first().json;\nconst cfg = $('Configuración').first().json.cfg || {};\nconst c = $('Cliente').first().json.c || {};\nconst p = $json || {};                                  // respuesta del panel: { dias, imagen } o un error\nconst SITIO = 'https://iagro360.xyz';\nconst conLote = c.lat != null && c.lon != null;\nconst dias = Array.isArray(p.dias) ? p.dias : [];\nconst norm = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');\nconst fmtMm = (mm) => (mm >= 1 ? String(Math.round(mm)) : Number(mm).toFixed(1));\nconst nombre = /[a-záéíóúñ]/i.test(m.nombre_whatsapp) ? m.nombre_whatsapp.split(/\\s+/)[0] : '';\n\nconst lugar = conLote ? 'tu ubicación' : 'Santa Cruz';\nconst pie = conLote ? 'IAGRO · Según tu ubicación' : 'IAGRO · Santa Cruz (general)';\nconst PEDIR = '\\n\\n👉 Este pronóstico es de *Santa Cruz en general*. Para el de *tu lote*, toca *📍 Mi ubicación*.';\nconst B = { ubic: '📍 Mi ubicación', radar: '📡 Ver radar', manana: '📅 Mañana', semana: '📅 Ver semana', actualizar: '🔄 Actualizar' };\n// Sin ubicación, el primer botón siempre la pide\nconst nav = (a, b) => (conLote ? [a, b] : [B.ubic, a]);\n\nconst to = m.telefono;\nconst base = { messaging_product: 'whatsapp', recipient_type: 'individual', to };\nconst conBotones = (texto, lista, imagen) => ({ ...base, type: 'interactive', interactive: {\n  type: 'button',\n  ...(imagen ? { header: { type: 'image', image: { link: imagen } } } : {}),\n  body: { text: texto.slice(0, 1024) },\n  footer: { text: pie },\n  action: { buttons: lista.slice(0, 3).map((t, i) => ({ type: 'reply', reply: { id: 'b' + (i + 1), title: t } })) },\n} });\nconst conEnlace = (texto, boton, url) => ({ ...base, type: 'interactive', interactive: {\n  type: 'cta_url', body: { text: texto.slice(0, 1024) }, footer: { text: pie },\n  action: { name: 'cta_url', parameters: { display_text: boton, url } },\n} });\nconst pedirUbicacion = (texto) => ({ ...base, type: 'interactive', interactive: {\n  type: 'location_request_message', body: { text: texto }, action: { name: 'send_location' },\n} });\nconst soloTexto = (texto) => ({ ...base, type: 'text', text: { body: texto, preview_url: false } });\n\n// ---------- Textos con el pronóstico ----------\nconst proxima = dias.find((d) => d.mm >= 1);\nconst iProx = proxima ? dias.indexOf(proxima) : -1;\nconst cuando = (d) => (dias.indexOf(d) === 0 ? 'hoy' : dias.indexOf(d) === 1 ? 'mañana' : d.nombre.toLowerCase() + ' ' + d.ddmm);\n\nfunction semana() {\n  let t = proxima\n    ? '🌧️ Lluvia en ' + lugar + ': *' + cuando(proxima) + (proxima.inicio ? ' desde las ' + proxima.inicio : '') + ', unos ' + fmtMm(proxima.mm) + ' mm*' + (proxima.prob ? ' (' + proxima.prob + '%)' : '') + '.'\n    : '☀️ Sin lluvias importantes en ' + lugar + ' en los próximos días.';\n  const antes = iProx === -1 ? dias.slice(0, 7) : dias.slice(0, iProx);\n  const calor = antes.length ? Math.max(...antes.map((d) => d.max ?? -99)) : -99;\n  if (iProx >= 2) t += '\\nAntes, ' + iProx + ' días secos' + (calor >= 35 ? ' y con calor (hasta ' + calor + '°)' : '') + '.';\n  else if (iProx === -1 && calor >= 35) t += '\\nCon calor: hasta ' + calor + '°.';\n  if (dias.slice(0, 3).filter((d) => d.viento >= 20).length >= 2) t += '\\n⚠️ Viento fuerte estos días: no conviene fumigar.';\n  return t;\n}\n\nfunction delDia() {\n  const i = m.dia === 'hoy' ? 0 : m.dia === 'manana' ? 1 : dias.findIndex((d) => norm(d.nombre) === m.dia);\n  const d = dias[i < 0 ? 0 : i];\n  const etiqueta = i <= 0 ? 'Hoy' : i === 1 ? 'Mañana' : d.nombre;\n  let t = '📍 ' + (conLote ? 'Tu ubicación' : 'Santa Cruz (general)') + '\\n*' + etiqueta + ' ' + d.ddmm + ':* ' + (d.min ?? '–') + '° a ' + (d.max ?? '–') + '°\\n';\n  t += d.mm >= 1 ? '🌧️ Lluvia' + (d.inicio ? ' desde las ' + d.inicio : '') + ', unos ' + fmtMm(d.mm) + ' mm' + (d.prob ? ' (' + d.prob + '%)' : '') + '.'\n    : d.mm > 0 ? '🌦️ Apenas unas gotas (' + fmtMm(d.mm) + ' mm).' : '☀️ Sin lluvia.';\n  t += '\\n💨 Viento ' + d.viento + ' km/h' + (d.dir ? ' ' + d.dir : '') + '.';\n  if (d.viento >= 20) t += ' No conviene fumigar.';\n  else if (d.mm < 1) t += ' Buen día para aplicar, temprano.';\n  return t;\n}\n\nfunction lluvia() {\n  if (!proxima) return '☀️ Sin lluvias importantes en ' + lugar + ' en los próximos ' + dias.length + ' días.';\n  let t = '🌧️ Próxima lluvia en ' + lugar + ':\\n*' + cuando(proxima).replace(/^./, (x) => x.toUpperCase()) + (proxima.inicio ? ' desde las ' + proxima.inicio : '') + ', unos ' + fmtMm(proxima.mm) + ' mm*' + (proxima.prob ? ' (' + proxima.prob + '%)' : '') + '.';\n  if (iProx >= 2) t += '\\nAntes, ' + iProx + ' días secos.';\n  return t;\n}\n\n// ---------- Respuesta según la intención ----------\nconst radarUrl = SITIO + '/radar/' + (conLote && c.id ? c.id : 'santa-cruz');\nconst imagen = p.imagen ? SITIO + p.imagen : null;\nconst NECESITA_DATOS = ['SEMANA', 'DIA', 'LLUVIA', 'UBICACION_RECIBIDA', 'INVITACION'];\nlet cuerpo, resumen;\n\nif (NECESITA_DATOS.includes(m.intent) && !dias.length) {\n  resumen = '⚠️ No pude traer el pronóstico en este momento. Intenta de nuevo en unos minutos.';\n  cuerpo = conBotones(resumen, [B.actualizar, B.radar]);\n} else if (m.intent === 'RADAR') {\n  resumen = '📡 Radar de lluvia en vivo ' + (conLote ? 'centrado en *tu ubicación*' : 'de *Santa Cruz*') + '. Toca el botón para verlo y mover el mapa.'\n    + (conLote ? '' : '\\n\\nPara verlo sobre tu lote, envíame tu ubicación con 📎.');\n  cuerpo = conEnlace(resumen, 'Ver radar', radarUrl);\n} else if (m.intent === 'PEDIR_UBICACION') {\n  resumen = '📍 Toca *Enviar ubicación* y elige el punto de tu lote (puedes mover el mapa hasta tu parcela). Solo la usamos para tu pronóstico y tu radar.';\n  cuerpo = pedirUbicacion(resumen);\n} else if (m.intent === 'GRACIAS') {\n  resumen = '¡A la orden' + (nombre ? ', ' + nombre : '') + '! 🌾 Escríbeme *lluvia*, *mañana* o *radar* cuando quieras.';\n  cuerpo = soloTexto(resumen);\n} else if (m.intent === 'FUERA') {\n  resumen = 'Por ahora solo te ayudo con el *pronóstico* y el *radar* de lluvia 🌦️';\n  cuerpo = conBotones(resumen, nav(B.semana, B.radar));\n} else if (m.intent === 'DIA') {\n  resumen = delDia() + (conLote ? '' : PEDIR);\n  cuerpo = conBotones(resumen, nav(B.semana, B.radar));\n} else if (m.intent === 'LLUVIA') {\n  resumen = lluvia() + (conLote ? '' : PEDIR);\n  cuerpo = conBotones(resumen, nav(B.radar, B.semana));\n} else {\n  // SEMANA, UBICACION_RECIBIDA, INVITACION: el primer mensaje, con la imagen de 7 días\n  let antes = '';\n  if (m.intent === 'UBICACION_RECIBIDA') antes = '✅ *Ubicación ' + (c.nuevo ? 'guardada' : 'actualizada') + '.* Desde ahora te muestro el pronóstico de ese punto.\\n\\n';\n  else if (m.intent === 'INVITACION') antes = '¡Hola' + (nombre ? ' ' + nombre : '') + '! 👋 Te invitaron a *IAGRO*: pronóstico y radar de lluvia para tu campo.\\n\\n';\n  else if (m.saludo) antes = '¡Hola' + (nombre ? ' ' + nombre : '') + '! 👋\\n\\n';\n  resumen = antes + semana() + (conLote ? '' : PEDIR);\n  cuerpo = conBotones(resumen, conLote ? [B.radar, B.manana, B.actualizar] : [B.ubic, B.radar, B.manana], imagen);\n}\n\nreturn [{ json: {\n  meta_url: 'https://graph.facebook.com/' + String(cfg.whatsapp_api_version || 'v25.0').trim() + '/' + String(cfg.whatsapp_phone_number_id || '1356446567560317').trim() + '/messages',\n  meta_cuerpo: cuerpo,\n  resumen,\n  chatwoot: String(cfg.chatwoot_url_publica || '').replace(/\\/+$/, '') + '/api/v1/accounts/' + cfg.chatwoot_account_id + '/conversations/' + m.conversation_id + '/messages',\n} }];"
+      },
+      "name": "Armar respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ],
+      "id": "d4c2b1a0-0008-4c00-9000-000000000008"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.meta_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.meta_cuerpo) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Enviar (WhatsApp)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1540,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "WhatsApp API"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "id": "d4c2b1a0-0009-4c00-9000-000000000009"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Armar respuesta').first().json.chatwoot }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: '🤖 ' + $('Armar respuesta').first().json.resumen, message_type: 'outgoing', private: true }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "Nota en Chatwoot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1780,
+        -120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "d4c2b1a0-0010-4c00-9000-000000000010"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Por qué Meta no aceptó el mensaje (queda como nota privada en Chatwoot)\nconst e = $json.error || $json;\nlet detalle = e.description || e.message || '';\ntry {\n  const x = typeof e.description === 'string' && e.description.match(/\\{[\\s\\S]*\\}/);\n  const j = x ? JSON.parse(x[0]) : null;\n  if (j?.error) detalle = '(#' + j.error.code + ') ' + (j.error.error_data?.details || j.error.message);\n} catch (_) { /* se deja el texto tal cual */ }\nreturn [{ json: { motivo: String(e.httpCode ? 'HTTP ' + e.httpCode + ' · ' : '') + String(detalle || JSON.stringify(e)).slice(0, 500) } }];"
+      },
+      "name": "Motivo del error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        120
+      ],
+      "id": "d4c2b1a0-0011-4c00-9000-000000000011"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Armar respuesta').first().json.chatwoot }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $('Armar respuesta').first().json.resumen, message_type: 'outgoing', private: false }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "Enviar texto (Chatwoot)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2000,
+        120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "d4c2b1a0-0012-4c00-9000-000000000012"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Armar respuesta').first().json.chatwoot }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: '⚠️ WhatsApp no aceptó la respuesta del bot (se envió como texto). Motivo: ' + $('Motivo del error').first().json.motivo, message_type: 'outgoing', private: true }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "Nota del error",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2220,
+        120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3XgXgRqlWDyWhTB9",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "d4c2b1a0-0013-4c00-9000-000000000013"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Mensaje entrante",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje entrante": {
+      "main": [
+        [
+          {
+            "node": "Intención",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intención": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cliente": {
+      "main": [
+        [
+          {
+            "node": "Pronóstico (panel)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pronóstico (panel)": {
+      "main": [
+        [
+          {
+            "node": "Armar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar respuesta": {
+      "main": [
+        [
+          {
+            "node": "Enviar (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar (WhatsApp)": {
+      "main": [
+        [
+          {
+            "node": "Nota en Chatwoot",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Motivo del error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Motivo del error": {
+      "main": [
+        [
+          {
+            "node": "Enviar texto (Chatwoot)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar texto (Chatwoot)": {
+      "main": [
+        [
+          {
+            "node": "Nota del error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
